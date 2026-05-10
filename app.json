@@ -21,7 +21,8 @@
       "package": "com.godjihun.orurakapp"
     },
     "web": {
-      "output": "static",
+      "bundler": "metro",
+      "output": "single",
       "favicon": "./assets/images/logo.png"
     },
     "experiments": {
