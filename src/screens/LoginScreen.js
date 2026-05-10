@@ -26,17 +26,28 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // 웹과 앱 모두에서 무조건 작동하는 마법의 알림창 함수
+  const showCustomAlert = (title, message) => {
+    if (Platform.OS === 'web') {
+      // 웹 브라우저에서는 기본 alert 창 사용
+      window.alert(`[${title}]\n${message}`);
+    } else {
+      // 모바일 앱에서는 기존 Alert 사용
+      Alert.alert(title, message);
+    }
+  };
+
   const handleLogin = async () => {
-    // 💡 1. 빈칸 검사
+    // 1. 빈칸 검사
     if (!email.trim() || !password.trim()) {
-      Alert.alert('알림', '이메일과 비밀번호를 모두 입력해 주세요.');
+      showCustomAlert('알림', '이메일과 비밀번호를 모두 입력해 주세요.');
       return;
     }
 
-    // 💡 2. 이메일 형식 검사 (정규식 활용)
+    // 2. 이메일 형식 검사 (정규식 활용)
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
-      Alert.alert('알림', '올바른 이메일 형식이 아닙니다.\n예: user@example.com');
+      showCustomAlert('알림', '올바른 이메일 형식이 아닙니다.\n예: user@example.com');
       return;
     }
 
@@ -76,15 +87,15 @@ export default function LoginScreen({ navigation }) {
       }
   
     } catch (error) {
-      // 💡 3. 서버에서 보내온 에러 코드(status)에 따른 맞춤형 알림창
+      // 3. 서버에서 보내온 에러 코드(status)에 따른 맞춤형 알림창
       if (error.response) {
         if (error.response.status === 401) {
-          Alert.alert('로그인 실패', '아이디 또는 비밀번호가 일치하지 않습니다.\n다시 확인해 주세요.');
+          showCustomAlert('로그인 실패', '아이디 또는 비밀번호가 일치하지 않습니다.\n다시 확인해 주세요.');
         } else {
-          Alert.alert('서버 오류', `서버에 문제가 발생했습니다. (에러 코드: ${error.response.status})`);
+          showCustomAlert('서버 오류', `서버에 문제가 발생했습니다. (에러 코드: ${error.response.status})`);
         }
       } else {
-        Alert.alert('네트워크 오류', '서버와 연결할 수 없습니다. 인터넷 상태를 확인해 주세요.');
+        showCustomAlert('네트워크 오류', '서버와 연결할 수 없습니다. 인터넷 상태를 확인해 주세요.');
       }
     } finally {
       setLoading(false);

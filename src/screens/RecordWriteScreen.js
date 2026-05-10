@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 import { Feather } from '@expo/vector-icons';
@@ -17,10 +17,9 @@ import Slider from '@react-native-community/slider';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 
 import CustomButton from '../components/customButton';
+import SuccessModal from '../components/SuccessModal';
 import { COLORS } from '../constants/colors';
 import { TYPOGRAPHY } from '../constants/typography';
-
-import SuccessModal from '../components/SuccessModal';
 
 import { createJournal, recordStairs, skipToday } from '../api/socialStairApi';
 
@@ -35,7 +34,6 @@ export default function RecordWriteScreen({ navigation }) {
     const [isTimePickerVisible, setTimePickerVisibility] = useState(false);
     const [currentTimeIndex, setCurrentTimeIndex] = useState(null);
 
-    // 층수 데이터도 시간과 세트로 묶이기 위해 배열로 변경!
     const [startFloors, setStartFloors] = useState(['']);
     const [endFloors, setEndFloors] = useState(['']);
     
@@ -43,7 +41,6 @@ export default function RecordWriteScreen({ navigation }) {
     const [journalText, setJournalText] = useState('');
     const [withFriend, setWithFriend] = useState(false);
 
-    // 모달 관리 상태들
     const [isSuccessModalVisible, setSuccessModalVisible] = useState(false);
     const [achievementRate, setAchievementRate] = useState(30); 
     const [modalTitle, setModalTitle] = useState('대단해요!');
@@ -51,6 +48,15 @@ export default function RecordWriteScreen({ navigation }) {
 
     const isStairs = moveMethod === '계단';
     const isNotWorking = moveMethod === '출근 안 함';
+
+    // 웹/앱 공통 알림창 함수 추가
+    const showCustomAlert = (title, message) => {
+        if (Platform.OS === 'web') {
+            window.alert(`[${title}]\n${message}`);
+        } else {
+            Alert.alert(title, message);
+        }
+    };
 
     const handleSelectMethod = (method) => {
         setMoveMethod(method);
@@ -72,7 +78,6 @@ export default function RecordWriteScreen({ navigation }) {
         }
     };
 
-    // + 버튼 누르면 시간, 시작층, 도착층 모두 세트로 1칸씩 늘어남
     const addTimeInput = () => {
         if (!isNotWorking) { 
             setRecordTimes([...recordTimes, '']);
@@ -81,14 +86,12 @@ export default function RecordWriteScreen({ navigation }) {
         }
     };
 
-    // - 버튼 누르면 세트로 지워짐
     const removeTimeInput = (indexToRemove) => {
         setRecordTimes(recordTimes.filter((_, index) => index !== indexToRemove));
         setStartFloors(startFloors.filter((_, index) => index !== indexToRemove));
         setEndFloors(endFloors.filter((_, index) => index !== indexToRemove));
     };
 
-    // 개별 층수 업데이트 함수
     const updateStartFloor = (index, value) => {
         const newFloors = [...startFloors];
         newFloors[index] = value;
@@ -102,7 +105,7 @@ export default function RecordWriteScreen({ navigation }) {
     };
 
     const showTimePicker = (index) => {
-        if (isNotWorking) return; // 엘리베이터일 때도 열려야 하므로 isNotWorking으로 검사
+        if (isNotWorking) return; 
         setCurrentTimeIndex(index);
         setTimePickerVisibility(true);
     };
@@ -127,13 +130,12 @@ export default function RecordWriteScreen({ navigation }) {
     };
 
     const handleSubmit = async () => {
-        // 1. 빈칸 검사 로직 (계단, 엘리베이터 둘 다 빈칸 검사)
         if (moveMethod === '계단' || moveMethod === '엘리베이터') {
-            const hasEmptyTime = recordTimes.some(time => time === '');
-            const hasEmptyFloor = startFloors.some(f => f === '') || endFloors.some(f => f === '');
+            const hasEmptyTime = recordTimes.some(time => !time.trim());
+            const hasEmptyFloor = startFloors.some(f => !f.trim()) || endFloors.some(f => !f.trim());
             
-            if (hasEmptyTime || hasEmptyFloor || !journalText) {
-                Alert.alert('알림', '시간, 층수, 성찰 일지를 모두 입력해주세요!');
+            if (hasEmptyTime || hasEmptyFloor || !journalText.trim()) {
+                showCustomAlert('알림', '시간, 층수, 성찰 일지를 모두 입력해주세요!');
                 return; 
             }
         }
@@ -141,9 +143,7 @@ export default function RecordWriteScreen({ navigation }) {
         setLoading(true);
 
         try {
-            // 2. 선택한 이동 방법에 따른 API 호출
             if (moveMethod === '계단') {
-                // 배열로 매핑해서 보냄
                 const recordsPayload = recordTimes.map((time, index) => ({
                     fromFloor: parseInt(startFloors[index], 10),
                     toFloor: parseInt(endFloors[index], 10),
@@ -179,12 +179,11 @@ export default function RecordWriteScreen({ navigation }) {
                 setAchievementRate(0);
             }
 
-            // 3. 통신이 모두 성공하면 성공 모달 띄우기
             setSuccessModalVisible(true);
 
         } catch (error) {
             console.error("기록 등록 실패:", error);
-            Alert.alert('에러', '기록을 등록하는 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.');
+            showCustomAlert('에러', '기록을 등록하는 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.');
         } finally {
             setLoading(false);
         }
@@ -246,16 +245,32 @@ export default function RecordWriteScreen({ navigation }) {
                 
                 {recordTimes.map((time, index) => (
                     <View key={index} style={styles.timeInputRow}>
-                    <TouchableOpacity 
-                        // 엘리베이터도 활성화되도록 !isStairs 대신 isNotWorking 사용
-                        style={[styles.timeInputWrapper, isNotWorking && styles.disabledInput]}
-                        onPress={() => showTimePicker(index)}
-                        disabled={isNotWorking}
-                    >
-                        <Text style={[styles.timeInputText, !time && styles.placeholderText]}>
-                        {time || "예) 오후 12:00"}
-                        </Text>
-                    </TouchableOpacity>
+                    
+                    {/* 웹에서는 텍스트 입력창으로, 앱에서는 터치 팝업으로 분기 처리 */}
+                    {Platform.OS === 'web' ? (
+                        <TextInput
+                            style={[styles.timeInputWrapper, isNotWorking && styles.disabledInput, styles.timeInputText, { paddingHorizontal: 16 }]}
+                            placeholder="예) 14:00"
+                            placeholderTextColor={COLORS.gray}
+                            value={time}
+                            onChangeText={(val) => {
+                                const newTimes = [...recordTimes];
+                                newTimes[index] = val;
+                                setRecordTimes(newTimes);
+                            }}
+                            editable={!isNotWorking}
+                        />
+                    ) : (
+                        <TouchableOpacity 
+                            style={[styles.timeInputWrapper, isNotWorking && styles.disabledInput]}
+                            onPress={() => showTimePicker(index)}
+                            disabled={isNotWorking}
+                        >
+                            <Text style={[styles.timeInputText, !time && styles.placeholderText]}>
+                            {time || "예) 오후 12:00"}
+                            </Text>
+                        </TouchableOpacity>
+                    )}
                     
                     {index === recordTimes.length - 1 ? (
                         <TouchableOpacity 
@@ -276,19 +291,20 @@ export default function RecordWriteScreen({ navigation }) {
                     </View>
                 ))}
 
-                <DateTimePickerModal
-                    isVisible={isTimePickerVisible}
-                    mode="time"
-                    onConfirm={handleConfirmTime}
-                    onCancel={hideTimePicker}
-                    confirmTextIOS="확인"
-                    cancelTextIOS="취소"
-                />
+                {Platform.OS !== 'web' && (
+                    <DateTimePickerModal
+                        isVisible={isTimePickerVisible}
+                        mode="time"
+                        onConfirm={handleConfirmTime}
+                        onCancel={hideTimePicker}
+                        confirmTextIOS="확인"
+                        cancelTextIOS="취소"
+                    />
+                )}
                 </View>
 
                 <View style={styles.inputGroup}>
                 <Text style={styles.sectionTitle}>몇 층부터 몇 층까지 올라가셨나요?</Text>
-                {/* 시간이 추가된 개수만큼 층수 입력창도 반복 생성 */}
                 {recordTimes.map((_, index) => (
                     <View key={index} style={[styles.floorInputRow, index > 0 && { marginTop: 12 }]}>
                         <TextInput
@@ -481,7 +497,6 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: 8,
     justifyContent: 'center',
-    paddingHorizontal: 16,
   },
   timeInputText: {
     fontFamily: 'Pretendard-Medium',
@@ -514,9 +529,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    width: '100%',
   },
   floorInput: {
-    flex: 1,
+    width: '42%', // 기존 flex: 1을 고정 비율로 변경
     height: 48,
     backgroundColor: COLORS.white,
     borderWidth: 1,

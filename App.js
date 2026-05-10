@@ -1,7 +1,9 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
+import { Platform } from 'react-native'; // 웹/앱 구분을 위해 추가
 
+import AsyncStorage from '@react-native-async-storage/async-storage'; // 웹 저장소용 추가
 import { useFonts } from 'expo-font';
 import * as SecureStore from 'expo-secure-store';
 import * as SplashScreen from 'expo-splash-screen';
@@ -38,7 +40,13 @@ export default function App() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const token = await SecureStore.getItemAsync('userToken');
+        // 웹과 앱을 구분하여 토큰을 꺼내옵니다.
+        let token = null;
+        if (Platform.OS === 'web') {
+          token = await AsyncStorage.getItem('userToken');
+        } else {
+          token = await SecureStore.getItemAsync('userToken');
+        }
         
         if (!token) {
           // 토큰이 없으면 로그인 화면으로
@@ -53,7 +61,7 @@ export default function App() {
               setInitialRoute('MainTab'); // 목표가 있으면 홈(메인 탭)으로
             }
           } catch (e) {
-            // 💡 백엔드에서 이번 주 목표를 찾지 못해 404 에러를 뱉는 경우!
+            // 백엔드에서 이번 주 목표를 찾지 못해 404 에러를 뱉는 경우!
             if (e.response && e.response.status === 404) {
               setInitialRoute('Start'); // 목표 설정 화면으로 이동!
             } else {
