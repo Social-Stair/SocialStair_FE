@@ -1,6 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -9,6 +10,7 @@ import {
 } from 'react-native';
 
 import { Feather } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
@@ -82,7 +84,14 @@ export default function HomeScreen() {
     useCallback(() => {
       const fetchHomeData = async () => {
         try {
-          const savedName = await SecureStore.getItemAsync('userNickname');
+          // 웹과 앱 분기 처리 (닉네임 가져오기)
+          let savedName = null;
+          if (Platform.OS === 'web') {
+            savedName = await AsyncStorage.getItem('userNickname');
+          } else {
+            savedName = await SecureStore.getItemAsync('userNickname');
+          }
+
           if (savedName) setNickname(savedName);
 
           const statsData = await getHomeStats();
@@ -123,7 +132,15 @@ export default function HomeScreen() {
           const tokenData = await Notifications.getExpoPushTokenAsync().catch(() => null);
           if (tokenData && tokenData.data) {
             const token = tokenData.data;
-            const userId = await SecureStore.getItemAsync('userId'); 
+            
+            // 웹과 앱 분기 처리 (유저 ID 가져오기)
+            let userId = null;
+            if (Platform.OS === 'web') {
+              userId = await AsyncStorage.getItem('userId');
+            } else {
+              userId = await SecureStore.getItemAsync('userId');
+            }
+            
             if (userId) {
               await updateFcmToken(userId, token);
             }

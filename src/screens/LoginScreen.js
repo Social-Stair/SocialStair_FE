@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   Alert,
   Image,
+  Platform,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -10,6 +11,7 @@ import {
   View
 } from 'react-native';
 
+import AsyncStorage from '@react-native-async-storage/async-storage'; // 웹용 저장소 추가
 import * as SecureStore from 'expo-secure-store';
 
 import CustomButton from '../components/customButton';
@@ -35,15 +37,24 @@ export default function LoginScreen({ navigation }) {
     setLoading(true);
 
     try {
-      const response = await login(email, password); // 로그인 API 호출 [cite: 22]
+      const response = await login(email, password); // 로그인 API 호출
       
-      // 1. 회원가입 후 최초 로그인 여부 확인
-      // 로컬 저장소에 'hasSeenInitial' 값이 없으면 최초 로그인으로 간주
-      const hasSeenInitial = await SecureStore.getItemAsync('hasSeenInitial');
+      // 1. 회원가입 후 최초 로그인 여부 확인 (웹/앱 분기 처리)
+      let hasSeenInitial = null;
+      if (Platform.OS === 'web') {
+        hasSeenInitial = await AsyncStorage.getItem('hasSeenInitial');
+      } else {
+        hasSeenInitial = await SecureStore.getItemAsync('hasSeenInitial');
+      }
       
       if (!hasSeenInitial) {
-        // 최초 로그인이라면 InitialScreen으로 이동
-        await SecureStore.setItemAsync('hasSeenInitial', 'true');
+        // 최초 로그인이라면 값을 저장하고 InitialScreen으로 이동 (웹/앱 분기 처리)
+        if (Platform.OS === 'web') {
+          await AsyncStorage.setItem('hasSeenInitial', 'true');
+        } else {
+          await SecureStore.setItemAsync('hasSeenInitial', 'true');
+        }
+        
         navigation.replace('Initial');
         return;
       }
@@ -92,7 +103,7 @@ export default function LoginScreen({ navigation }) {
           <TextInput
             style={styles.input}
             placeholder="이메일을 입력해주세요"
-            placeholderTextColor={COLORS.gray} // 색상 상수 적용
+            placeholderTextColor={COLORS.gray} 
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -101,7 +112,7 @@ export default function LoginScreen({ navigation }) {
           <TextInput
             style={styles.input}
             placeholder="비밀번호를 입력해주세요"
-            placeholderTextColor={COLORS.gray} // 색상 상수 적용
+            placeholderTextColor={COLORS.gray} 
             secureTextEntry
             value={password}
             onChangeText={setPassword}
@@ -165,7 +176,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Pretendard-ExtraBold',
     color: COLORS.primary,
     fontSize: 28,
-    letterSpacing: 28 * -0.025, // JS에서 연산 처리
+    letterSpacing: 28 * -0.025, 
   },
   formContainer: {
     width: '100%',
