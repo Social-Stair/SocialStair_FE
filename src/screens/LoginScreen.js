@@ -11,14 +11,13 @@ import {
   View
 } from 'react-native';
 
-import AsyncStorage from '@react-native-async-storage/async-storage'; // 웹용 저장소 추가
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 
+import { getGoal, login } from '../api/socialStairApi';
 import CustomButton from '../components/customButton';
 import { COLORS } from '../constants/colors';
 import { TYPOGRAPHY } from '../constants/typography';
-
-import { getGoal, login } from '../api/socialStairApi';
 
 const logoImage = require('../../assets/images/logo.png');
 
@@ -28,18 +27,24 @@ export default function LoginScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    // 1. 빈칸 검사
-    if (!email || !password) {
-      Alert.alert('알림', '이메일과 비밀번호를 모두 입력해주세요.');
+    // 💡 1. 빈칸 검사
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('알림', '이메일과 비밀번호를 모두 입력해 주세요.');
+      return;
+    }
+
+    // 💡 2. 이메일 형식 검사 (정규식 활용)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      Alert.alert('알림', '올바른 이메일 형식이 아닙니다.\n예: user@example.com');
       return;
     }
 
     setLoading(true);
 
     try {
-      const response = await login(email, password); // 로그인 API 호출
+      const response = await login(email.trim(), password); 
       
-      // 1. 회원가입 후 최초 로그인 여부 확인 (웹/앱 분기 처리)
       let hasSeenInitial = null;
       if (Platform.OS === 'web') {
         hasSeenInitial = await AsyncStorage.getItem('hasSeenInitial');
@@ -48,7 +53,6 @@ export default function LoginScreen({ navigation }) {
       }
       
       if (!hasSeenInitial) {
-        // 최초 로그인이라면 값을 저장하고 InitialScreen으로 이동 (웹/앱 분기 처리)
         if (Platform.OS === 'web') {
           await AsyncStorage.setItem('hasSeenInitial', 'true');
         } else {
@@ -59,24 +63,29 @@ export default function LoginScreen({ navigation }) {
         return;
       }
   
-      // 2. 이번 주 목표 설정 여부 확인 
       try {
         const goalData = await getGoal();
         if (!goalData || !goalData.goalFloors) {
-          // 목표가 없으면 목표 설정 화면(StartScreen)으로
           navigation.replace('Start');
         } else {
-          // 목표가 이미 있으면 홈으로
           navigation.replace('MainTab');
         }
       } catch (goalError) {
-        // 목표 데이터가 없어서 404 등 에러가 발생한 경우, 무조건 목표 설정 화면으로
-        console.log('목표 조회 에러 (아마 목표 미설정 상태):', goalError.response?.status);
+        console.log('목표 조회 에러:', goalError.response?.status);
         navigation.replace('Start'); 
       }
   
     } catch (error) {
-      Alert.alert('로그인 실패', '정보를 확인해주세요.');
+      // 💡 3. 서버에서 보내온 에러 코드(status)에 따른 맞춤형 알림창
+      if (error.response) {
+        if (error.response.status === 401) {
+          Alert.alert('로그인 실패', '아이디 또는 비밀번호가 일치하지 않습니다.\n다시 확인해 주세요.');
+        } else {
+          Alert.alert('서버 오류', `서버에 문제가 발생했습니다. (에러 코드: ${error.response.status})`);
+        }
+      } else {
+        Alert.alert('네트워크 오류', '서버와 연결할 수 없습니다. 인터넷 상태를 확인해 주세요.');
+      }
     } finally {
       setLoading(false);
     }
@@ -86,7 +95,6 @@ export default function LoginScreen({ navigation }) {
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         
-        {/* 1. 로고 영역 */}
         <View style={styles.logoContainer}>
           <View style={styles.shadowBox}>
             <Image
@@ -98,7 +106,6 @@ export default function LoginScreen({ navigation }) {
           <Text style={styles.logoText}>오르락</Text>
         </View>
 
-        {/* 2. 입력 폼 영역 */}
         <View style={styles.formContainer}>
           <TextInput
             style={styles.input}
@@ -127,7 +134,6 @@ export default function LoginScreen({ navigation }) {
           
         </View>
 
-        {/* 3. 회원가입 링크 영역 */}
         <View style={styles.signupContainer}>
           <Text style={styles.signupText}>계정이 없으신가요? </Text>
           <TouchableOpacity onPress={() => navigation.navigate('Register')}>
@@ -141,69 +147,15 @@ export default function LoginScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background, 
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  shadowBox: {
-    shadowColor: '#000000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 6,
-    borderRadius: 16,
-    backgroundColor: COLORS.white,
-    marginBottom: 12,
-  },
-  logo: {
-    width: 76,
-    height: 76,
-  },
-  logoText: {
-    fontFamily: 'Pretendard-ExtraBold',
-    color: COLORS.primary,
-    fontSize: 28,
-    letterSpacing: 28 * -0.025, 
-  },
-  formContainer: {
-    width: '100%',
-    gap: 12,
-    marginBottom: 30,
-  },
-  input: {
-    ...TYPOGRAPHY.placeholder, 
-    color: COLORS.black,      
-    width: '100%',
-    height: 48,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-  },
-  signupContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  signupText: {
-    ...TYPOGRAPHY.placeholder, 
-  },
-  signupLink: {
-    fontFamily: 'Pretendard-SemiBold',
-    color: COLORS.gray,
-    fontSize: 14,
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  content: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20 },
+  logoContainer: { alignItems: 'center', marginBottom: 40 },
+  shadowBox: { shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 4, elevation: 6, borderRadius: 16, backgroundColor: COLORS.white, marginBottom: 12 },
+  logo: { width: 76, height: 76 },
+  logoText: { fontFamily: 'Pretendard-ExtraBold', color: COLORS.primary, fontSize: 28, letterSpacing: 28 * -0.025 },
+  formContainer: { width: '100%', gap: 12, marginBottom: 30 },
+  input: { ...TYPOGRAPHY.placeholder, color: COLORS.black, width: '100%', height: 48, backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, paddingHorizontal: 16 },
+  signupContainer: { flexDirection: 'row', alignItems: 'center' },
+  signupText: { ...TYPOGRAPHY.placeholder },
+  signupLink: { fontFamily: 'Pretendard-SemiBold', color: COLORS.gray, fontSize: 14 },
 });

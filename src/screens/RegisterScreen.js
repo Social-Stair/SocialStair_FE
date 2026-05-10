@@ -29,61 +29,45 @@ export default function RegisterScreen({ navigation }) {
   const [floor, setFloor] = useState('');
 
   const handleRegister = async () => {
-    // 1. 유효성 검사
-    if (!email || !password || !passwordConfirm || !nickname || !floor) {
-      Alert.alert('알림', '모든 항목을 입력해주세요.');
+    // 1. 빈칸 검사
+    if (!email.trim() || !password.trim() || !nickname.trim() || !floor) {
+      Alert.alert('알림', '모든 항목을 빠짐없이 입력해 주세요.');
       return;
     }
 
-    if (password !== passwordConfirm) {
-      Alert.alert('알림', '비밀번호가 일치하지 않습니다.');
+    // 2. 이메일 형식 검사
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      Alert.alert('알림', '올바른 이메일 형식이 아닙니다.');
+      return;
+    }
+
+    // 3. 비밀번호 길이 검사 (예: 6자리 이상)
+    if (password.length < 6) {
+      Alert.alert('알림', '비밀번호는 6자리 이상으로 설정해 주세요.');
       return;
     }
 
     setLoading(true);
 
     try {
-      // 2. 백엔드 회원가입 API 호출
-      await registerUser(email, password, nickname, floor); // [cite: 13]
+      // 회원가입 API 호출
+      await registerUser(email.trim(), password, nickname.trim(), floor);
       
-      // 3. 성공 처리
-      Alert.alert('회원가입 완료', '가입이 완료되었습니다.\n로그인 화면에서 접속해주세요.', [
-        { 
-          text: '확인', 
-          onPress: () => navigation.replace('Login') 
-        }
+      Alert.alert('가입 완료', '환영합니다! 회원가입이 완료되었습니다.', [
+        { text: '확인', onPress: () => navigation.replace('Initial') } // 💡 성공 시 화면 이동
       ]);
 
     } catch (error) {
-      // 1. 서버에서 보내온 에러 메시지 추출
-      const errorMessage = error.response?.data?.error || "";
-      console.log('서버 에러 메시지:', errorMessage);
-
-      if (error.response && error.response.status === 400) {
-        // 2. 메시지 내용에 포함된 키워드별로 분기 처리
-        if (errorMessage.includes('improperly formatted')) {
-          Alert.alert('회원가입 실패', '이메일 형식이 올바르지 않습니다.\n(예: user@example.com)');
-        } 
-        else if (errorMessage.includes('at least 6 characters')) {
-          Alert.alert('회원가입 실패', '비밀번호는 최소 6자리 이상으로 설정해주세요.');
-        } 
-        else if (errorMessage.includes('이미 사용중인')) {
-          // 닉네임이나 이메일이 이미 존재할 때
-          if (errorMessage.includes('닉네임')) {
-            Alert.alert('회원가입 실패', '이미 사용 중인 닉네임입니다.');
-          }
+      // 💡 서버 에러 처리 (API 명세서 기준: 닉네임 중복 400 에러) [cite: 15]
+      if (error.response) {
+        if (error.response.status === 400) {
+          Alert.alert('회원가입 실패', '이미 사용 중인 닉네임이거나 입력값이 잘못되었습니다.\n다른 닉네임으로 시도해 주세요.');
+        } else {
+          Alert.alert('서버 오류', `회원가입 중 문제가 발생했습니다. (${error.response.status})`);
         }
-        else if (errorMessage.includes('email address is already in use')) {
-          Alert.alert('회원가입 실패', '이미 가입된 이메일입니다.');
-        }
-        else {
-          // 그 외 기타 400 에러
-          Alert.alert('회원가입 실패', '입력하신 정보가 서버 규칙에 맞지 않습니다. 다시 확인해주세요.');
-        }
-      } 
-      else {
-        // 500 에러 또는 네트워크 문제
-        Alert.alert('오류', '서버와 통신할 수 없습니다. 잠시 후 다시 시도해주세요.');
+      } else {
+        Alert.alert('네트워크 오류', '서버와 연결할 수 없습니다.');
       }
     } finally {
       setLoading(false);
