@@ -115,3 +115,8 @@ export const updateFcmToken = async (userId, fcmToken) => {
     });
     return response.data;
 };
+
+export const getNotificationsData = async (limit = 20) => {
+    const response = await apiClient.get(`https://getnotifications-3dgekfmjca-uc.a.run.app?limit=${limit}`);
+    return response.data;
+};

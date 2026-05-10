@@ -9,12 +9,11 @@ import {
 } from 'react-native';
 
 import { Feather } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 
-import { getHomeStats, updateFcmToken } from '../api/socialStairApi';
+import { getHomeStats, getNotificationsData, updateFcmToken } from '../api/socialStairApi';
 import { COLORS } from '../constants/colors';
 import { TYPOGRAPHY } from '../constants/typography';
 
@@ -33,6 +32,7 @@ export default function HomeScreen() {
   const [lastWeekRate, setLastWeekRate] = useState(0); 
   const [notifications, setNotifications] = useState([]);
 
+  // 시간 변환 함수
   const getRelativeTime = (timestamp) => {
     const now = Date.now();
     const diffInSeconds = Math.floor((now - timestamp) / 1000);
@@ -48,6 +48,36 @@ export default function HomeScreen() {
     return `${diffInWeeks}주 전`;
   };
 
+  // 서버에서 알림 목록을 불러오는 함수 (재사용을 위해 분리)
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const notiData = await getNotificationsData(20); // 최근 20개 불러오기
+      if (notiData && notiData.notifications) {
+        
+        const formattedNotis = notiData.notifications.map(n => {
+          // Firebase Timestamp 형식을 일반 밀리초(ms)로 변환
+          let ts = Date.now();
+          if (n.sentAt) {
+            ts = n.sentAt._seconds ? n.sentAt._seconds * 1000 : new Date(n.sentAt).getTime();
+          }
+          return {
+            id: n.notificationId,
+            title: n.title,
+            body: n.body,
+            type: n.type,
+            timestamp: ts,
+            isRead: n.isRead,
+          };
+        });
+        
+        setNotifications(formattedNotis);
+      }
+    } catch (error) {
+      console.error('알림 목록 불러오기 실패:', error);
+    }
+  }, []);
+
+  // 화면에 포커스 될 때마다 홈 데이터 + 알림 목록 새로고침
   useFocusEffect(
     useCallback(() => {
       const fetchHomeData = async () => {
@@ -70,79 +100,51 @@ export default function HomeScreen() {
           console.error("홈 데이터 새로고침 실패:", error);
         }
       };
+
       fetchHomeData();
+      fetchNotifications(); // 화면에 들어올 때마다 서버에서 알림 갱신
       return () => {}; 
-    }, [nickname]) 
+    }, [fetchNotifications]) 
   );
 
   useEffect(() => {
+    // 푸시 알림 권한 및 토큰 등록
     const registerForPushNotificationsAsync = async () => {
       if (Device.isDevice) {
         try {
           const { status: existingStatus } = await Notifications.getPermissionsAsync();
           let finalStatus = existingStatus;
-          
           if (existingStatus !== 'granted') {
             const { status } = await Notifications.requestPermissionsAsync();
             finalStatus = status;
           }
           if (finalStatus !== 'granted') return;
 
-          const tokenData = await Notifications.getExpoPushTokenAsync().catch((err) => {
-            console.log('Expo Go 환경에서는 푸시 토큰을 가져올 수 없습니다 (정상입니다).', err.message);
-            return null;
-          });
-
+          const tokenData = await Notifications.getExpoPushTokenAsync().catch(() => null);
           if (tokenData && tokenData.data) {
             const token = tokenData.data;
             const userId = await SecureStore.getItemAsync('userId'); 
             if (userId) {
               await updateFcmToken(userId, token);
-              console.log('서버에 FCM 토큰 등록 완료:', token);
             }
           }
         } catch (e) {
-          console.log('푸시 알림 설정 중 에러 발생 (Expo Go 제한):', e);
+          console.log('푸시 알림 설정 중 에러 발생:', e);
         }
-      } else {
-        console.log('푸시 알림은 실제 기기에서만 작동합니다.');
       }
     };
 
     registerForPushNotificationsAsync();
 
-    const loadSavedNotifications = async () => {
-      try {
-        const saved = await AsyncStorage.getItem('savedNotifications');
-        if (saved) setNotifications(JSON.parse(saved));
-      } catch (e) {
-        console.error('알림 불러오기 에러:', e);
-      }
-    };
-    loadSavedNotifications();
-
+    // 앱이 켜져있을 때 푸시 알림이 오면 로컬에 저장할 필요 없이 서버에 다시 알림 목록 요청
     const notificationListener = Notifications.addNotificationReceivedListener(async (notification) => {
-      const nowTime = Date.now();
-      
-      const newNoti = {
-        id: nowTime.toString(), 
-        timestamp: nowTime, // 시간에 쓸 고유 타임스탬프
-        type: 'info', 
-        title: notification.request.content.title || '성찰 일지 알림',
-        body: notification.request.content.body || '새로운 알림이 도착했습니다.',
-      };
-
-      setNotifications((prev) => {
-        const updatedList = [newNoti, ...prev];
-        AsyncStorage.setItem('savedNotifications', JSON.stringify(updatedList));
-        return updatedList;
-      });
+      fetchNotifications();
     });
 
     return () => {
       notificationListener.remove();
     };
-  }, []);
+  }, [fetchNotifications]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -154,7 +156,7 @@ export default function HomeScreen() {
           <Text style={styles.mainHeader}>오늘도 계단 한 층 더!</Text>
         </View>
 
-        {/* 주간 목표 카드 */}
+        {/* 주간 목표 카드 (사다리꼴 적용됨) */}
         <View style={styles.goalCard}>
           <View style={styles.accumulateContainer}>
             <Text style={styles.accumulateLabel}>이번 주 누적</Text>
@@ -171,7 +173,6 @@ export default function HomeScreen() {
           <View style={styles.progressContainer}>
             <View style={styles.progressBackground}>
               <View style={[styles.progressFill, { width: `${Math.min(goalData.achievementRate, 100)}%` }]} />
-              
               <View style={styles.progressMask} />
             </View>
             <View style={styles.progressTextRow}>
@@ -218,7 +219,9 @@ export default function HomeScreen() {
               <Text style={styles.notiDescription}>새로운 알림이 없습니다</Text>
             ) : (
               notifications.map((noti, index) => {
-                const isAlert = noti.type === 'alert'; 
+                // 행동을 요구하는 알림(리마인드, 목표설정)은 빨간색 삼각형 / 성과는 노란색 종
+                const isAlert = ['afternoon', 'evening', 'wednesday', 'weeklyGoal'].includes(noti.type); 
+                
                 return (
                   <React.Fragment key={noti.id}>
                     <View style={styles.notiItem}>
@@ -230,10 +233,7 @@ export default function HomeScreen() {
                       <View style={styles.notiContent}>
                         <View style={styles.notiHeader}>
                           <Text style={styles.notiCategory}>{noti.title}</Text>
-                          {/* 💡 여기서 시간에 마법(getRelativeTime)을 걸어줍니다! */}
-                          <Text style={styles.notiTime}>
-                            {noti.timestamp ? getRelativeTime(noti.timestamp) : noti.time}
-                          </Text>
+                          <Text style={styles.notiTime}>{getRelativeTime(noti.timestamp)}</Text>
                         </View>
                         <Text style={styles.notiDescription}>{noti.body}</Text>
                       </View>
@@ -252,219 +252,41 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 68,
-    paddingBottom: 140,
-  },
-  headerContainer: {
-    marginBottom: 24,
-    gap: 2,
-  },
-  subHeader: {
-    ...TYPOGRAPHY.subHeader,
-  },
-  mainHeader: {
-    ...TYPOGRAPHY.mainHeader,
-  },
-  
-  // 주간 목표 카드 스타일
-  goalCard: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 8,
-    padding: 24,
-    marginBottom: 20,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  progressContainer: {
-    // marginBottom: 16,
-  },
-  progressBackground: {
-    height: 32, 
-    backgroundColor: '#3F5DC8',
-    borderRadius: 0,
-    marginBottom: 10,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#4AD8FF',
-  },
-  progressMask: {
-    position: 'absolute',
-    top: -30,
-    left: '-20%',
-    width: '120%',
-    height: 40,
-    backgroundColor: COLORS.primary,
-    transform: [{ rotate: '-4deg' }], 
-  },
-  progressTextRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  progressLabel: {
-    fontFamily: 'Pretendard-SemiBold',
-    color: COLORS.white,
-    fontSize: 14,
-    letterSpacing: 14 * -0.025,
-  },
-  progressValue: {
-    fontFamily: 'Pretendard-Medium',
-    color: COLORS.white,
-    fontSize: 14,
-    letterSpacing: 14 * -0.025,
-  },
-  accumulateContainer: {
-    marginBottom: 24,
-  },
-  accumulateLabel: {
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#EDF1FF',
-    fontSize: 14,
-    marginBottom: 4,
-    letterSpacing: 14 * -0.025,
-  },
-  accumulateValueRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 4,
-  },
-  accumulateNumber: {
-    fontFamily: 'Pretendard-SemiBold',
-    color: COLORS.white,
-    fontSize: 40,
-    lineHeight: 48,
-    letterSpacing: 40 * -0.025,
-  },
-  accumulateUnit: {
-    fontFamily: 'Pretendard-SemiBold',
-    color: COLORS.white,
-    fontSize: 16,
-    marginBottom: 6, // 숫자와 라인을 맞추기 위함
-    letterSpacing: 16 * -0.025,
-  },
-  trendIconContainer: {
-    position: 'absolute',
-    right: 24,
-    top: 24, 
-    width: 66,
-    height: 66,
-    backgroundColor: '#3F5DC8',
-    borderRadius: 33,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // 통계 카드 (연속 기록 & 달성도) 스타일
-  statsRow: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 32,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 8,
-    padding: 16,
-    gap: 12,
-  },
-  statHeader: {
-    gap: 8,
-  },
-  iconCircle: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#EDF1FF',
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  statLabel: {
-    fontFamily: 'Pretendard-Medium',
-    color: COLORS.gray,
-    fontSize: 14,
-    letterSpacing: 14 * -0.025,
-  },
-  statValueRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 2,
-  },
-  statNumber: {
-    fontFamily: 'Pretendard-SemiBold',
-    color: COLORS.black,
-    fontSize: 28,
-    lineHeight: 34,
-  },
-  statUnit: {
-    fontFamily: 'Pretendard-SemiBold',
-    color: COLORS.black,
-    fontSize: 16,
-    marginBottom: 2,
-  },
-
-  // 알림 리스트 스타일
-  notificationSection: {
-    gap: 12,
-  },
-  sectionTitle: {
-    ...TYPOGRAPHY.sectionTitle,
-  },
-  notificationBox: {
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 8,
-    padding: 18,
-  },
-  notiItem: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'flex-start',
-  },
-  notiContent: {
-    flex: 1,
-    gap: 4,
-  },
-  notiHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  notiCategory: {
-    fontFamily: 'Pretendard-Medium',
-    color: COLORS.gray,
-    fontSize: 11,
-    flex: 1,
-    marginRight: 8,
-    letterSpacing: 11 * -0.025,
-  },
-  notiTime: {
-    fontFamily: 'Pretendard-Medium',
-    color: COLORS.gray,
-    fontSize: 10,
-    letterSpacing: 10 * -0.025,
-  },
-  notiDescription: {
-    fontFamily: 'Pretendard-Medium',
-    color: COLORS.gray,
-    fontSize: 13,
-    lineHeight: 18,
-    letterSpacing: 13 * -0.025,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: COLORS.border,
-    marginVertical: 16,
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 68, paddingBottom: 140 },
+  headerContainer: { marginBottom: 24, gap: 2 },
+  subHeader: { ...TYPOGRAPHY.subHeader },
+  mainHeader: { ...TYPOGRAPHY.mainHeader },
+  goalCard: { backgroundColor: COLORS.primary, borderRadius: 8, padding: 24, marginBottom: 20, position: 'relative', overflow: 'hidden' },
+  progressContainer: {},
+  progressBackground: { height: 32, backgroundColor: '#3F5DC8', borderRadius: 0, marginBottom: 10, overflow: 'hidden', position: 'relative' },
+  progressFill: { height: '100%', backgroundColor: '#4AD8FF' },
+  progressMask: { position: 'absolute', top: -30, left: '-20%', width: '120%', height: 40, backgroundColor: COLORS.primary, transform: [{ rotate: '-4deg' }] },
+  progressTextRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  progressLabel: { fontFamily: 'Pretendard-SemiBold', color: COLORS.white, fontSize: 14, letterSpacing: 14 * -0.025 },
+  progressValue: { fontFamily: 'Pretendard-Medium', color: COLORS.white, fontSize: 14, letterSpacing: 14 * -0.025 },
+  accumulateContainer: { marginBottom: 24 },
+  accumulateLabel: { fontFamily: 'Pretendard-SemiBold', color: '#EDF1FF', fontSize: 14, marginBottom: 4, letterSpacing: 14 * -0.025 },
+  accumulateValueRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
+  accumulateNumber: { fontFamily: 'Pretendard-SemiBold', color: COLORS.white, fontSize: 40, lineHeight: 48, letterSpacing: 40 * -0.025 },
+  accumulateUnit: { fontFamily: 'Pretendard-SemiBold', color: COLORS.white, fontSize: 16, marginBottom: 6, letterSpacing: 16 * -0.025 },
+  trendIconContainer: { position: 'absolute', right: 24, top: 24, width: 66, height: 66, backgroundColor: '#3F5DC8', borderRadius: 33, justifyContent: 'center', alignItems: 'center' },
+  statsRow: { flexDirection: 'row', gap: 16, marginBottom: 32 },
+  statCard: { flex: 1, backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, padding: 16, gap: 12 },
+  statHeader: { gap: 8 },
+  iconCircle: { width: 40, height: 40, backgroundColor: '#EDF1FF', borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  statLabel: { fontFamily: 'Pretendard-Medium', color: COLORS.gray, fontSize: 14, letterSpacing: 14 * -0.025 },
+  statValueRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
+  statNumber: { fontFamily: 'Pretendard-SemiBold', color: COLORS.black, fontSize: 28, lineHeight: 34 },
+  statUnit: { fontFamily: 'Pretendard-SemiBold', color: COLORS.black, fontSize: 16, marginBottom: 2 },
+  notificationSection: { gap: 12 },
+  sectionTitle: { ...TYPOGRAPHY.sectionTitle },
+  notificationBox: { backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, padding: 18 },
+  notiItem: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  notiContent: { flex: 1, gap: 4 },
+  notiHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  notiCategory: { fontFamily: 'Pretendard-Medium', color: COLORS.gray, fontSize: 11, flex: 1, marginRight: 8, letterSpacing: 11 * -0.025 },
+  notiTime: { fontFamily: 'Pretendard-Medium', color: COLORS.gray, fontSize: 10, letterSpacing: 10 * -0.025 },
+  notiDescription: { fontFamily: 'Pretendard-Medium', color: COLORS.gray, fontSize: 13, lineHeight: 18, letterSpacing: 13 * -0.025 },
+  divider: { height: 1, backgroundColor: COLORS.border, marginVertical: 16 },
 });
