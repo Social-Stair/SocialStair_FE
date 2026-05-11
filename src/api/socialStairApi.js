@@ -7,25 +7,33 @@ import apiClient from './client';
 
 // 로그인 API
 export const login = async (email, password) => {
-    const response = await apiClient.post('https://login-3dgekfmjca-uc.a.run.app', { email, password });
-    
-    if (response.data.token) {
-      // 웹과 앱을 구분하여 로그인 정보 저장
-      if (Platform.OS === 'web') {
-        await AsyncStorage.setItem('userToken', response.data.token);
-        await AsyncStorage.setItem('refreshToken', response.data.refreshToken);
-        if(response.data.nickname) {
-          await AsyncStorage.setItem('userNickname', response.data.nickname);
-        }
-      } else {
-        await SecureStore.setItemAsync('userToken', response.data.token);
-        await SecureStore.setItemAsync('refreshToken', response.data.refreshToken);
-        if(response.data.nickname) {
-          await SecureStore.setItemAsync('userNickname', response.data.nickname);
-        }
+  const response = await apiClient.post('https://login-3dgekfmjca-uc.a.run.app', { email, password });
+  
+  if (response.data.token) {
+    // 웹과 앱을 구분하여 로그인 정보 저장
+    if (Platform.OS === 'web') {
+      await AsyncStorage.setItem('userToken', response.data.token);
+      await AsyncStorage.setItem('refreshToken', response.data.refreshToken);
+      if(response.data.nickname) {
+        await AsyncStorage.setItem('userNickname', response.data.nickname);
+      }
+      // 로그인 시 userId도 함께 기기에 저장
+      if(response.data.userId) {
+        await AsyncStorage.setItem('userId', response.data.userId);
+      }
+    } else {
+      await SecureStore.setItemAsync('userToken', response.data.token);
+      await SecureStore.setItemAsync('refreshToken', response.data.refreshToken);
+      if(response.data.nickname) {
+        await SecureStore.setItemAsync('userNickname', response.data.nickname);
+      }
+      // 로그인 시 userId도 함께 기기에 저장
+      if(response.data.userId) {
+        await SecureStore.setItemAsync('userId', response.data.userId);
       }
     }
-    return response.data;
+  }
+  return response.data;
 };
 
 /* --- 2. 계단 기록 관련 API --- */
@@ -65,15 +73,37 @@ export const createJournal = async (content, satisfaction) => {
 
 // 회원가입 API 
 export const registerUser = async (email, password, nickname, floor) => {
-    const response = await apiClient.post('https://register-3dgekfmjca-uc.a.run.app', {
-      email,
-      password,
-      nickname,
-      floor: Number(floor) 
-    });
-    
-    
-    return response.data; 
+  const response = await apiClient.post('https://register-3dgekfmjca-uc.a.run.app', {
+    email,
+    password,
+    nickname,
+    floor: Number(floor) 
+  });
+  
+  // API 명세서에 맞춰 회원가입 직후에도 토큰과 userId를 저장하여 자동 로그인 처리
+  if (response.data.token) {
+    if (Platform.OS === 'web') {
+      await AsyncStorage.setItem('userToken', response.data.token);
+      await AsyncStorage.setItem('refreshToken', response.data.refreshToken);
+      if(response.data.nickname) {
+        await AsyncStorage.setItem('userNickname', response.data.nickname);
+      }
+      if(response.data.userId) {
+        await AsyncStorage.setItem('userId', response.data.userId);
+      }
+    } else {
+      await SecureStore.setItemAsync('userToken', response.data.token);
+      await SecureStore.setItemAsync('refreshToken', response.data.refreshToken);
+      if(response.data.nickname) {
+        await SecureStore.setItemAsync('userNickname', response.data.nickname);
+      }
+      if(response.data.userId) {
+        await SecureStore.setItemAsync('userId', response.data.userId);
+      }
+    }
+  }
+  
+  return response.data; 
 };
 
 export const getHomeStats = async (weekKey = '') => {

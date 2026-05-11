@@ -37,6 +37,8 @@ export default function RecordWriteScreen({ navigation }) {
     const [startFloors, setStartFloors] = useState(['']);
     const [endFloors, setEndFloors] = useState(['']);
     
+    const [openDropdownInfo, setOpenDropdownInfo] = useState(null);
+    
     const [satisfaction, setSatisfaction] = useState(1);
     const [journalText, setJournalText] = useState('');
     const [withFriend, setWithFriend] = useState(false);
@@ -44,12 +46,13 @@ export default function RecordWriteScreen({ navigation }) {
     const [isSuccessModalVisible, setSuccessModalVisible] = useState(false);
     const [achievementRate, setAchievementRate] = useState(30); 
     const [modalTitle, setModalTitle] = useState('대단해요!');
+    const [modalMainText, setModalMainText] = useState(null); 
     const [modalSubText, setModalSubText] = useState('삼성관 대학원생들의\n건강한 움직임을 응원합니다.\n지금의 좋은 기운을 유지해보세요!');
+    const [showConfetti, setShowConfetti] = useState(true);
 
     const isStairs = moveMethod === '계단';
     const isNotWorking = moveMethod === '출근 안 함';
 
-    // 웹/앱 공통 알림창 함수 추가
     const showCustomAlert = (title, message) => {
         if (Platform.OS === 'web') {
             window.alert(`[${title}]\n${message}`);
@@ -61,6 +64,7 @@ export default function RecordWriteScreen({ navigation }) {
     const handleSelectMethod = (method) => {
         setMoveMethod(method);
         setIsDropdownOpen(false);
+        setOpenDropdownInfo(null);
         
         if (method === '출근 안 함') {
             setRecordTimes(['']);
@@ -90,6 +94,7 @@ export default function RecordWriteScreen({ navigation }) {
         setRecordTimes(recordTimes.filter((_, index) => index !== indexToRemove));
         setStartFloors(startFloors.filter((_, index) => index !== indexToRemove));
         setEndFloors(endFloors.filter((_, index) => index !== indexToRemove));
+        setOpenDropdownInfo(null);
     };
 
     const updateStartFloor = (index, value) => {
@@ -145,14 +150,17 @@ export default function RecordWriteScreen({ navigation }) {
         try {
             if (moveMethod === '계단') {
                 const recordsPayload = recordTimes.map((time, index) => ({
-                    fromFloor: parseInt(startFloors[index], 10),
+                    fromFloor: startFloors[index] === 'B1' ? -1 : parseInt(startFloors[index], 10),
                     toFloor: parseInt(endFloors[index], 10),
                     time: time, 
                     withColleague: withFriend
                 }));
 
-                const recordResponse = await recordStairs(recordsPayload); 
-                await createJournal(journalText, parseInt(satisfaction, 10)); 
+                // Promise.all을 사용해서 두 개의 API를 동시에 전송
+                const [recordResponse] = await Promise.all([
+                    recordStairs(recordsPayload),
+                    createJournal(journalText, parseInt(satisfaction, 10))
+                ]);
 
                 setAchievementRate(recordResponse.achievementRate || 0);
 
@@ -163,19 +171,25 @@ export default function RecordWriteScreen({ navigation }) {
                     setModalTitle('수고하셨어요!');
                     setModalSubText('오늘의 건강한 발걸음이 기록되었습니다.\n지금의 좋은 기운을 유지해보세요!');
                 }
+                setModalMainText(null); 
+                setShowConfetti(true);
 
             } else if (moveMethod === '엘리베이터') {
                 await createJournal(journalText, parseInt(satisfaction, 10));
                 
                 setModalTitle('일지 작성 완료');
-                setModalSubText('오늘의 성찰 일지가 무사히 기록되었습니다.');
+                setModalMainText('성찰 일지가 기록되었습니다 📥');
+                setModalSubText('');
+                setShowConfetti(false);
                 setAchievementRate(0); 
 
             } else if (moveMethod === '출근 안 함') {
                 await skipToday();
                 
-                setModalTitle('설정 완료');
-                setModalSubText('오늘은 푹 쉬시고, 다음 출근 때 뵙겠습니다!');
+                setModalTitle('일지 작성 완료');
+                setModalMainText('오늘은 푹 쉬시고,\n다음 출근 때 뵙겠습니다! 🙌🏻');
+                setModalSubText('');
+                setShowConfetti(false);
                 setAchievementRate(0);
             }
 
@@ -194,13 +208,48 @@ export default function RecordWriteScreen({ navigation }) {
         navigation.goBack();
     };
 
+    const renderFloorList = (items, isStartFloor, index) => {
+        const handleSelect = (floor) => {
+            if (isStartFloor) updateStartFloor(index, floor);
+            else updateEndFloor(index, floor);
+            setOpenDropdownInfo(null);
+        };
+
+        return (
+            <ScrollView 
+                style={[{ flex: 1 }, Platform.OS === 'web' && { overflowY: 'auto', overscrollBehavior: 'contain' }]}
+                contentContainerStyle={{ paddingVertical: 4 }}
+                nestedScrollEnabled={true} 
+                showsVerticalScrollIndicator={true}
+                keyboardShouldPersistTaps="handled" 
+            >
+                {items.map(floor => (
+                    <TouchableOpacity 
+                        key={floor} 
+                        style={styles.floorDropdownItem}
+                        onPress={() => handleSelect(floor)}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={styles.floorDropdownItemText}>
+                            {isStartFloor && floor === 'B1' ? 'B1 (지하1층)' : `${floor}층`}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </ScrollView>
+        );
+    };
+
     return (
         <SafeAreaView style={styles.container}>
         <KeyboardAvoidingView 
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={{ flex: 1 }}
         >
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+                contentContainerStyle={styles.scrollContent} 
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+            >
             
             <View style={styles.headerContainer}>
                 <View>
@@ -246,10 +295,9 @@ export default function RecordWriteScreen({ navigation }) {
                 {recordTimes.map((time, index) => (
                     <View key={index} style={styles.timeInputRow}>
                     
-                    {/* 웹에서는 텍스트 입력창으로, 앱에서는 터치 팝업으로 분기 처리 */}
                     {Platform.OS === 'web' ? (
                         <TextInput
-                            style={[styles.timeInputWrapper, isNotWorking && styles.disabledInput, styles.timeInputText, { paddingHorizontal: 16 }]}
+                            style={[styles.timeInputWrapper, isNotWorking && styles.disabledInput, styles.timeInputText]}
                             placeholder="예) 14:00"
                             placeholderTextColor={COLORS.gray}
                             value={time}
@@ -303,35 +351,72 @@ export default function RecordWriteScreen({ navigation }) {
                 )}
                 </View>
 
-                <View style={styles.inputGroup}>
-                <Text style={styles.sectionTitle}>몇 층부터 몇 층까지 올라가셨나요?</Text>
-                {recordTimes.map((_, index) => (
-                    <View key={index} style={[styles.floorInputRow, index > 0 && { marginTop: 12 }]}>
-                        <TextInput
-                        style={[styles.floorInput, isNotWorking && styles.disabledInput]}
-                        placeholder="예) 1층"
-                        placeholderTextColor={COLORS.gray}
-                        value={startFloors[index]}
-                        onChangeText={(val) => updateStartFloor(index, val)}
-                        editable={!isNotWorking}
-                        keyboardType="numeric"
-                        />
-                        <Text style={styles.arrowText}>→</Text>
-                        <TextInput
-                        style={[styles.floorInput, isNotWorking && styles.disabledInput]}
-                        placeholder="예) 12층"
-                        placeholderTextColor={COLORS.gray}
-                        value={endFloors[index]}
-                        onChangeText={(val) => updateEndFloor(index, val)}
-                        editable={!isNotWorking}
-                        keyboardType="numeric"
-                        />
-                    </View>
-                ))}
+                <View style={[styles.inputGroup, { zIndex: 10 }]}>
+                  <Text style={styles.sectionTitle}>몇 층부터 몇 층까지 올라가셨나요?</Text>
+                  {recordTimes.map((_, index) => {
+                      const isStartOpen = openDropdownInfo?.type === 'start' && openDropdownInfo?.index === index;
+                      const isEndOpen = openDropdownInfo?.type === 'end' && openDropdownInfo?.index === index;
+                      const isAnyOpen = isStartOpen || isEndOpen;
+
+                      return (
+                        <View key={index} style={[
+                            styles.floorInputRow, 
+                            index > 0 && { marginTop: 12 }, 
+                            { zIndex: 100 - index },
+                            isAnyOpen && { height: 212, marginBottom: -164 } 
+                        ]}>
+                            
+                            {/* 출발층 드롭다운 */}
+                            <View style={[styles.floorDropdownContainer, isStartOpen && { zIndex: 100 }]}>
+                                <TouchableOpacity
+                                    style={[styles.floorInputBtn, isNotWorking && styles.disabledInput]}
+                                    onPress={() => !isNotWorking && setOpenDropdownInfo(isStartOpen ? null : { type: 'start', index })}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={[styles.floorInputText, !startFloors[index] && styles.placeholderText]}>
+                                        {startFloors[index] ? (startFloors[index] === 'B1' ? 'B1 (지하1층)' : `${startFloors[index]}층`) : "선택"}
+                                    </Text>
+                                    <Feather name="chevron-down" size={16} color={COLORS.gray} />
+                                </TouchableOpacity>
+                                
+                                {isStartOpen && (
+                                    <View style={styles.floorDropdownMenu}>
+                                        {renderFloorList(['B1', '1', '2', '3', '4', '5', '6'], true, index)}
+                                    </View>
+                                )}
+                            </View>
+
+                            <View style={styles.arrowContainer}>
+                                <Text style={styles.arrowText}>→</Text>
+                            </View>
+                            
+                            {/* 도착층 드롭다운 */}
+                            <View style={[styles.floorDropdownContainer, isEndOpen && { zIndex: 100 }]}>
+                                <TouchableOpacity
+                                    style={[styles.floorInputBtn, isNotWorking && styles.disabledInput]}
+                                    onPress={() => !isNotWorking && setOpenDropdownInfo(isEndOpen ? null : { type: 'end', index })}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={[styles.floorInputText, !endFloors[index] && styles.placeholderText]}>
+                                        {endFloors[index] ? `${endFloors[index]}층` : "선택"}
+                                    </Text>
+                                    <Feather name="chevron-down" size={16} color={COLORS.gray} />
+                                </TouchableOpacity>
+
+                                {isEndOpen && (
+                                    <View style={styles.floorDropdownMenu}>
+                                        {renderFloorList(['1', '2', '3', '4', '5', '6', '7'], false, index)}
+                                    </View>
+                                )}
+                            </View>
+
+                        </View>
+                      );
+                  })}
                 </View>
 
-                <View style={styles.inputGroup}>
-                <Text style={styles.sectionTitle}>이동 방법은 나의 의지에 따른 선택이었나요?</Text>
+                <View style={[styles.inputGroup, { zIndex: 1 }]}>
+                <Text style={styles.sectionTitle}>다음 이동 시 계단을 이용할 의향이 얼마나 있습니까?</Text>
                 <View style={styles.satisfactionWrapper}>
                     <Slider
                     style={styles.slider}
@@ -352,12 +437,12 @@ export default function RecordWriteScreen({ navigation }) {
                     </View>
                     <View style={styles.satisfactionLabels}>
                     <Text style={styles.satisfactionLabel}>매우 아님</Text>
-                    <Text style={styles.satisfactionLabel}>매우 그러함</Text>
+                    <Text style={styles.satisfactionLabel}>매우 있음</Text>
                     </View>
                 </View>
                 </View>
 
-                <View style={styles.inputGroup}>
+                <View style={[styles.inputGroup, { zIndex: 1 }]}>
                 <Text style={styles.sectionTitle}>성찰 일지</Text>
                 <TextInput
                     style={[styles.journalInput, isNotWorking && styles.disabledInput]}
@@ -408,6 +493,8 @@ export default function RecordWriteScreen({ navigation }) {
             achievementRate={achievementRate}
             title={modalTitle}
             subText={modalSubText}
+            mainText={modalMainText} 
+            showConfetti={showConfetti} 
         />
 
         </SafeAreaView>
@@ -415,220 +502,55 @@ export default function RecordWriteScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 68,
-    paddingBottom: 64,
-  },
-  headerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center', 
-    marginBottom: 24,
-  },
-  subHeader: {
-    ...TYPOGRAPHY.subHeader,
-    marginBottom: 2,
-  },
-  mainHeader: {
-    ...TYPOGRAPHY.mainHeader,
-  },
-  formContainer: {
-    gap: 24,
-  },
-  inputGroup: {
-    gap: 10,
-    zIndex: 1, 
-  },
-  sectionTitle: {
-    ...TYPOGRAPHY.sectionTitle,
-  },
-  dropdownBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    height: 48,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-  },
-  dropdownText: {
-    fontFamily: 'Pretendard-Medium',
-    fontSize: 14,
-    color: COLORS.gray,
-    letterSpacing: 14 * -0.025,
-  },
-  dropdownList: {
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 8,
-    marginTop: -4, 
-    overflow: 'hidden',
-  },
-  dropdownItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.background,
-  },
-  dropdownItemText: {
-    fontFamily: 'Pretendard-Medium',
-    fontSize: 14,
-    color: COLORS.black,
-    letterSpacing: 14 * -0.025,
-  },
-  timeInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  timeInputWrapper: {
-    flex: 1,
-    height: 48,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 8,
-    justifyContent: 'center',
-  },
-  timeInputText: {
-    fontFamily: 'Pretendard-Medium',
-    fontSize: 14,
-    color: COLORS.black,
-  },
-  placeholderText: {
-    color: COLORS.gray,
-  },
-  plusButton: {
-    width: 48,
-    height: 48,
-    backgroundColor: COLORS.primary, 
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  minusButton: {
-    width: 48,
-    height: 48,
-    backgroundColor: '#F24242', 
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  disabledInput: {
-    backgroundColor: '#DBDEE6', 
-  },
-  floorInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-  },
-  floorInput: {
-    width: '42%', // 기존 flex: 1을 고정 비율로 변경
-    height: 48,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    ...TYPOGRAPHY.placeholder,
-    color: COLORS.black,
-    textAlign: 'center',
-  },
-  arrowText: {
-    fontFamily: 'Pretendard-Medium',
-    fontSize: 16,
-    color: COLORS.gray,
-    marginHorizontal: 12,
-  },
-  satisfactionWrapper: {
-    marginTop: 10,
-    marginBottom: 12,
-  },
-  slider: {
-    width: '100%',
-    height: 40,
-  },
-  satisfactionDotsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14, 
-    marginTop: -4,
-  },
-  scoreNumber: {
-    fontFamily: 'Pretendard-Medium',
-    fontSize: 14,
-    color: COLORS.gray,
-    letterSpacing: 14 * -0.025,
-  },
-  satisfactionLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 12,
-  },
-  satisfactionLabel: {
-    fontFamily: 'Pretendard-Medium',
-    fontSize: 12,
-    color: COLORS.gray,
-    letterSpacing: 12 * -0.025,
-  },
-  journalInput: {
-    height: 145,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 8,
-    padding: 16,
-    ...TYPOGRAPHY.placeholder,
-    color: COLORS.black,
-  },
-  checkboxContainer: {
-    alignItems: 'center', 
-    marginTop: 8,
-    gap: 8,
-  },
-  checkboxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  checkbox: {
-    width: 16,
-    height: 16,
-    borderWidth: 1,
-    borderColor: COLORS.gray,
-    borderRadius: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-  },
-  checkboxActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  checkboxText: {
-    fontFamily: 'Pretendard-SemiBold',
-    fontSize: 14,
-    color: COLORS.gray,
-    letterSpacing: 14 * -0.025,
-  },
-  checkboxSubText: {
-    fontFamily: 'Pretendard-Medium',
-    fontSize: 12,
-    color: COLORS.gray,
-    letterSpacing: 14 * -0.025,
-    textAlign: 'center', 
-  },
-  actionContainer: {
-    marginTop: 24,
-    alignItems: 'center', 
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 68, paddingBottom: 64 },
+  headerContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  subHeader: { ...TYPOGRAPHY.subHeader, marginBottom: 2 },
+  mainHeader: { ...TYPOGRAPHY.mainHeader },
+  formContainer: { gap: 24 },
+  inputGroup: { gap: 10 },
+  sectionTitle: { ...TYPOGRAPHY.sectionTitle },
+  
+  dropdownBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 48, backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, paddingHorizontal: 16 },
+  dropdownText: { fontFamily: 'Pretendard-Medium', fontSize: 14, color: COLORS.gray, letterSpacing: 14 * -0.025 },
+  dropdownList: { backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, marginTop: -4, overflow: 'hidden' },
+  dropdownItem: { paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: COLORS.background },
+  dropdownItemText: { fontFamily: 'Pretendard-Medium', fontSize: 14, color: COLORS.black, letterSpacing: 14 * -0.025 },
+  
+  timeInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  timeInputWrapper: { flex: 1, height: 48, backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, justifyContent: 'center', paddingHorizontal: 16 },
+  timeInputText: { fontFamily: 'Pretendard-Medium', fontSize: 14, color: COLORS.black, textAlign: 'left' },
+  placeholderText: { color: COLORS.gray },
+  plusButton: { width: 48, height: 48, backgroundColor: COLORS.primary, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  minusButton: { width: 48, height: 48, backgroundColor: '#F24242', borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  disabledInput: { backgroundColor: '#DBDEE6' },
+  
+  floorInputRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', width: '100%' },
+  
+  floorDropdownContainer: { width: '42%' }, 
+  floorInputBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 48, backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, paddingHorizontal: 12 },
+  floorInputText: { flex: 1, fontFamily: 'Pretendard-Medium', fontSize: 14, color: COLORS.black, textAlign: 'center' },
+  
+  floorDropdownMenu: { position: 'absolute', top: 52, left: 0, right: 0, height: 160, backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, overflow: 'hidden', elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, zIndex: 1000 },
+  floorDropdownItem: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: COLORS.background, alignItems: 'center' },
+  floorDropdownItemText: { fontFamily: 'Pretendard-Medium', fontSize: 14, color: COLORS.black },
+
+  arrowContainer: { height: 48, justifyContent: 'center', zIndex: 1 },
+  arrowText: { fontFamily: 'Pretendard-Medium', fontSize: 16, color: COLORS.gray, marginHorizontal: 12 },
+  
+  satisfactionWrapper: { marginTop: 10, marginBottom: 12 },
+  slider: { width: '100%', height: 40 },
+  satisfactionDotsRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 14, marginTop: -4 },
+  scoreNumber: { fontFamily: 'Pretendard-Medium', fontSize: 14, color: COLORS.gray, letterSpacing: 14 * -0.025 },
+  satisfactionLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 },
+  satisfactionLabel: { fontFamily: 'Pretendard-Medium', fontSize: 12, color: COLORS.gray, letterSpacing: 12 * -0.025 },
+  
+  journalInput: { height: 145, backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, padding: 16, ...TYPOGRAPHY.placeholder, color: COLORS.black },
+  checkboxContainer: { alignItems: 'center', marginTop: 8, gap: 8 },
+  checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  checkbox: { width: 16, height: 16, borderWidth: 1, borderColor: COLORS.gray, borderRadius: 4, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.white },
+  checkboxActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  checkboxText: { fontFamily: 'Pretendard-SemiBold', fontSize: 14, color: COLORS.gray, letterSpacing: 14 * -0.025 },
+  checkboxSubText: { fontFamily: 'Pretendard-Medium', fontSize: 12, color: COLORS.gray, letterSpacing: 14 * -0.025, textAlign: 'center' },
+  actionContainer: { marginTop: 24, alignItems: 'center' },
 });

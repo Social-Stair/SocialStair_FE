@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-//  1. 폭죽 이펙트 라이브러리 불러오기
+// 1. 폭죽 이펙트 라이브러리 불러오기
 import ConfettiCannon from 'react-native-confetti-cannon';
 
 import { COLORS } from '../constants/colors';
@@ -10,7 +10,9 @@ export default function SuccessModal({
   onClose, 
   achievementRate, 
   title, 
-  subText 
+  subText,
+  mainText,      // 추가: 모달 중앙 메인 텍스트 
+  showConfetti   // 추가: 폭죽 표시 여부
 }) {
   return (
     <Modal
@@ -23,8 +25,8 @@ export default function SuccessModal({
       <View style={styles.modalBackdrop}>
         <View style={styles.modalContainer}>
           
-          {/* 폭죽 이펙트 컴포넌트 추가 모달이 보일 때만 터지도록 설정 */}
-          {visible && (
+          {/* 폭죽은 visible이고 showConfetti가 true일 때만 터짐 */}
+          {visible && showConfetti && (
             <>
               {/* 왼쪽 대포 */}
               <ConfettiCannon
@@ -49,15 +51,22 @@ export default function SuccessModal({
 
           <View style={styles.modalTextContent}>
             <View style={styles.modalTitleGroup}>
-              {/* 대단해요 텍스트 */}
               <Text style={styles.modalTitle}>{title}</Text>
+              
+              {/* mainText가 있으면 그걸 띄우고, 없으면 기본 퍼센트 텍스트 띄움 */}
               <Text style={styles.modalMainText}>
-                벌써 주간 목표의 <Text style={styles.modalHighlightText}>{achievementRate}%</Text>를{'\n'}달성했습니다! 🎉
+                {mainText ? mainText : (
+                  <>벌써 주간 목표의 <Text style={styles.modalHighlightText}>{achievementRate}%</Text>를{'\n'}달성했습니다! 🎉</>
+                )}
               </Text>
             </View>
-            <Text style={styles.modalSubText}>
-              {subText}
-            </Text>
+            
+            {/* subText가 있을 때만 렌더링 */}
+            {subText ? (
+              <Text style={styles.modalSubText}>
+                {subText}
+              </Text>
+            ) : null}
           </View>
 
           <TouchableOpacity 
@@ -111,6 +120,7 @@ const styles = StyleSheet.create({
     lineHeight: 44.8,
     color: COLORS.black,
     textAlign: 'center',
+    letterSpacing: 32 * -0.025,
   },
   modalMainText: {
     fontFamily: 'Pretendard-SemiBold',
@@ -118,6 +128,7 @@ const styles = StyleSheet.create({
     lineHeight: 33.6,
     color: COLORS.black,
     textAlign: 'center',
+    letterSpacing: 24 * -0.025,
   },
   modalHighlightText: {
     color: COLORS.primary, 
@@ -130,6 +141,7 @@ const styles = StyleSheet.create({
     color: COLORS.gray,
     textAlign: 'center',
     marginTop: -10,
+    letterSpacing: 16 * -0.025,
   },
   completeButton: {
     width: 272,
@@ -145,5 +157,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.white,
     textAlign: 'center',
+    letterSpacing: 14 * -0.025
   }
 });

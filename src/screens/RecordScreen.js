@@ -1,12 +1,12 @@
 import React, { useCallback, useState } from 'react';
 import {
-    ActivityIndicator,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 import { Feather } from '@expo/vector-icons';
@@ -98,7 +98,7 @@ export default function RecordScreen({ navigation }) {
                     <View style={styles.cardContent}>
                       {/* 만족도 */}
                       <View style={styles.scoreRow}>
-                        <Text style={styles.scoreLabel}>나의 의지</Text>
+                        <Text style={styles.scoreLabel}>다음에 계단 이용할 의향</Text>
                         <Text style={styles.scoreValue}>{item.satisfaction}</Text>
                       </View>
                       

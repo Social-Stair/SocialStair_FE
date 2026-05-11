@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 import { Feather } from '@expo/vector-icons';
@@ -19,104 +23,128 @@ import { setGoal } from '../api/socialStairApi';
 const goalImage = require('../../assets/images/goal.png');
 
 export default function StartScreen({ navigation }) {
-  // 목표 층수 상태 관리 (기본값 1층)
-  const [floorCount, setFloorGoal] = useState(1);
-  const [loading, setLoading] = useState(false); // 로딩 상태 관리
+  const [floorCount, setFloorGoal] = useState('1');
+  const [loading, setLoading] = useState(false); 
+
+  const showCustomAlert = (title, message) => {
+    if (Platform.OS === 'web') {
+        window.alert(`[${title}]\n${message}`);
+    } else {
+        Alert.alert(title, message);
+    }
+  };
 
   const handleMinus = () => {
-    // 1층 밑으로는 내려가지 않도록 방지
-    if (floorCount > 1) {
-      setFloorGoal(floorCount - 1);
+    const current = parseInt(floorCount, 10) || 1;
+    if (current > 1) {
+      setFloorGoal(String(current - 1));
     }
   };
 
   const handlePlus = () => {
-    setFloorGoal(floorCount + 1);
+    const current = parseInt(floorCount, 10) || 0;
+    setFloorGoal(String(current + 1));
   };
 
   const handleStart = async () => {
-    setLoading(true); // 로딩 시작
-    try {
-      // 1. 백엔드로 목표 층수 전송
-      await setGoal(floorCount);
-      
-      console.log('목표 설정 성공:', floorCount);
+    const finalGoal = parseInt(floorCount, 10);
+    
+    if (isNaN(finalGoal) || finalGoal < 1) {
+      showCustomAlert('알림', '목표 층수는 1층 이상으로 입력해주세요.');
+      return;
+    }
 
-      // 2. 성공 시 메인 화면(홈)으로 이동
+    setLoading(true); 
+    try {
+      await setGoal(finalGoal);
+      console.log('목표 설정 성공:', finalGoal);
       navigation.replace('MainTab'); 
     } catch (error) {
       console.error('목표 설정 실패:', error);
-      Alert.alert('오류', '목표를 설정하는 중 문제가 발생했습니다. 다시 시도해주세요.');
+      showCustomAlert('오류', '목표를 설정하는 중 문제가 발생했습니다. 다시 시도해주세요.');
     } finally {
-      setLoading(false); // 로딩 종료
+      setLoading(false); 
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        
-        {/* 1. 상단 타이틀 영역 */}
-        <View style={styles.headerContainer}>
-          <Text style={styles.subHeader}>목표 설정</Text>
-          <Text style={styles.mainHeader}>이번 주 목표 층수</Text>
-        </View>
-
-        {/* 2. 중앙 캐릭터 이미지 영역 */}
-        <View style={styles.imageContainer}>
-          <View style={styles.imageShadow}>
-            <Image 
-              source={goalImage} 
-              style={styles.character} 
-              resizeMode="contain" 
-            />
+      {/* 1. 키보드가 올라올 때 화면을 밀어 올려주는 KeyboardAvoidingView 적용 */}
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        {/* 2. 내용이 밀려 올라갈 수 있도록 ScrollView 적용 */}
+        <ScrollView 
+            contentContainerStyle={styles.scrollContent} 
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled" // 키보드가 열려있을 때 다른 곳을 터치하면 닫히게 함
+        >
+          
+          <View style={styles.headerContainer}>
+            <Text style={styles.subHeader}>목표 설정</Text>
+            <Text style={styles.mainHeader}>이번 주 목표 층수</Text>
           </View>
-        </View>
 
-        {/* 3. 질문 및 서브 타이틀 영역 */}
-        <View style={styles.textContainer}>
-          <Text style={styles.questionText}>
-            앞으로 일주일 동안 총 몇 층{'\n'}오르는 것을 <Text style={styles.highlightText}>목표</Text>로 하시겠어요?
-          </Text>
-          <Text style={styles.subtitleText}>지난 주 계단 이용률은 확인하셨나요?</Text>
-        </View>
+          <View style={styles.imageContainer}>
+            <View style={styles.imageShadow}>
+              <Image 
+                source={goalImage} 
+                style={styles.character} 
+                resizeMode="contain" 
+              />
+            </View>
+          </View>
 
-        {/* 4. 숫자 조절(카운터) 영역 */}
-        <View style={styles.counterWrapper}>
-          <View style={styles.counterContainer}>
-            {/* 마이너스 버튼 */}
-            <TouchableOpacity style={styles.iconButton} onPress={handleMinus} activeOpacity={0.7}>
-              <Feather name="minus" size={24} color={COLORS.black} />
-            </TouchableOpacity>
-            
-            {/* 현재 숫자 */}
-            <Text style={styles.countText}>{floorCount}</Text>
-            
-            {/* 플러스 버튼 */}
-            <TouchableOpacity style={styles.iconButton} onPress={handlePlus} activeOpacity={0.7}>
-              <Feather name="plus" size={24} color={COLORS.black} />
+          <View style={styles.textContainer}>
+            <Text style={styles.questionText}>
+              앞으로 일주일 동안 총 몇 층{'\n'}오르는 것을 <Text style={styles.highlightText}>목표</Text>로 하시겠어요?
+            </Text>
+            <Text style={styles.subtitleText}>지난 주 계단 이용률은 확인하셨나요?</Text>
+          </View>
+
+          <View style={styles.counterWrapper}>
+            <View style={styles.counterContainer}>
+              <TouchableOpacity style={styles.iconButton} onPress={handleMinus} activeOpacity={0.7}>
+                <Feather name="minus" size={24} color={COLORS.black} />
+              </TouchableOpacity>
+              
+              <TextInput
+                style={styles.countTextInput}
+                value={floorCount}
+                onChangeText={(text) => {
+                  const numericValue = text.replace(/[^0-9]/g, '');
+                  setFloorGoal(numericValue);
+                }}
+                keyboardType="number-pad" 
+                selectTextOnFocus={true} 
+                maxLength={4} 
+              />
+              
+              <TouchableOpacity style={styles.iconButton} onPress={handlePlus} activeOpacity={0.7}>
+                <Feather name="plus" size={24} color={COLORS.black} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.unitText}>층</Text>
+          </View>
+
+          <View style={styles.actionContainer}>
+          <TouchableOpacity 
+              style={[styles.startButton, loading && { backgroundColor: COLORS.gray }]} 
+              onPress={handleStart}
+              activeOpacity={0.8}
+              disabled={loading} 
+            >
+              {loading ? (
+                <ActivityIndicator color={COLORS.white} />
+              ) : (
+                <Text style={styles.startButtonText}>지금 시작하기</Text>
+              )}
             </TouchableOpacity>
           </View>
-          <Text style={styles.unitText}>층</Text>
-        </View>
 
-        {/* 5. 시작하기 버튼 */}
-        <View style={styles.actionContainer}>
-        <TouchableOpacity 
-            style={[styles.startButton, loading && { backgroundColor: COLORS.gray }]} 
-            onPress={handleStart}
-            activeOpacity={0.8}
-            disabled={loading} // 로딩 중에는 중복 클릭 방지
-          >
-            {loading ? (
-              <ActivityIndicator color={COLORS.white} />
-            ) : (
-              <Text style={styles.startButtonText}>지금 시작하기</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
-      </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -126,9 +154,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background, 
   },
-  content: {
-    flex: 1,
+  // 3. ScrollView에 맞게 스타일 이름과 속성 변경 (flex: 1 대신 flexGrow: 1 사용)
+  scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 20,
+    paddingBottom: 40, // 키보드 여백 확보
   },
   headerContainer: {
     paddingTop: 68, 
@@ -206,13 +236,15 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 3,
   },
-  countText: {
+  countTextInput: {
     fontFamily: 'Pretendard-Bold',
     fontSize: 60,
-    lineHeight: 84,
     color: COLORS.primary,
     textAlign: 'center',
     letterSpacing: 60 * -0.025,
+    minWidth: 120, 
+    padding: 0,
+    margin: 0,
   },
   unitText: {
     fontFamily: 'Pretendard-SemiBold',
@@ -221,9 +253,10 @@ const styles = StyleSheet.create({
     color: COLORS.gray,
     letterSpacing: 20 * -0.025,
   },
+  // 버튼을 하단으로 밀어주기 위해 marginTop을 auto로 변경
   actionContainer: {
-    marginTop: 24, 
-    marginBottom: 40, 
+    marginTop: 0, 
+    paddingTop: 40,
     alignItems: 'center',
   },
   startButton: {
