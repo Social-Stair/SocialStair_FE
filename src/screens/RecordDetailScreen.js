@@ -1,16 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 import { Feather } from '@expo/vector-icons';
@@ -20,7 +20,6 @@ import SuccessModal from '../components/SuccessModal';
 import { COLORS } from '../constants/colors';
 import { TYPOGRAPHY } from '../constants/typography';
 
-// getRecords API 추가!
 import { deleteJournal, getRecords, updateJournal } from '../api/socialStairApi';
 
 export default function RecordDetailScreen({ route, navigation }) {
@@ -97,27 +96,50 @@ export default function RecordDetailScreen({ route, navigation }) {
     fetchMatchingStairsData();
   }, [journalData]);
 
-  const handleDelete = () => {
-    Alert.alert('기록 삭제', '정말로 이 일지를 삭제하시겠어요?', [
-      { text: '취소', style: 'cancel' },
-      { 
-        text: '삭제', 
-        style: 'destructive', 
-        onPress: async () => {
-          setLoading(true);
-          try {
-            await deleteJournal(journalData.id);
-            Alert.alert('삭제 완료', '일지가 삭제되었습니다.', [
-              { text: '확인', onPress: () => navigation.goBack() }
-            ]);
-          } catch (error) {
-            Alert.alert('오류', '삭제 중 문제가 발생했습니다.');
-          } finally {
-            setLoading(false);
-          }
-        } 
+  // 실제 삭제 API를 호출하는 공통 함수
+  const executeDelete = async () => {
+    setLoading(true);
+    try {
+      await deleteJournal(journalData.id);
+      
+      if (Platform.OS === 'web') {
+        window.alert('일지가 삭제되었습니다.');
+        navigation.goBack();
+      } else {
+        Alert.alert('삭제 완료', '일지가 삭제되었습니다.', [
+          { text: '확인', onPress: () => navigation.goBack() }
+        ]);
       }
-    ]);
+    } catch (error) {
+      if (Platform.OS === 'web') {
+        window.alert('삭제 중 문제가 발생했습니다.');
+      } else {
+        Alert.alert('오류', '삭제 중 문제가 발생했습니다.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 웹과 앱을 분리하여 알림창을 띄우는 삭제 버튼 핸들러
+  const handleDelete = () => {
+    if (Platform.OS === 'web') {
+      // 웹에서는 window.confirm 사용
+      const isConfirmed = window.confirm('정말로 이 일지를 삭제하시겠어요?');
+      if (isConfirmed) {
+        executeDelete();
+      }
+    } else {
+      // 모바일 앱에서는 기존 Alert.alert 사용
+      Alert.alert('기록 삭제', '정말로 이 일지를 삭제하시겠어요?', [
+        { text: '취소', style: 'cancel' },
+        { 
+          text: '삭제', 
+          style: 'destructive', 
+          onPress: executeDelete 
+        }
+      ]);
+    }
   };
 
   const handleEdit = async () => {
@@ -126,7 +148,11 @@ export default function RecordDetailScreen({ route, navigation }) {
       await updateJournal(journalData.id, journalText, satisfaction);
       setSuccessModalVisible(true);
     } catch (error) {
-      Alert.alert('오류', '수정 중 문제가 발생했습니다.');
+      if (Platform.OS === 'web') {
+        window.alert('수정 중 문제가 발생했습니다.');
+      } else {
+        Alert.alert('오류', '수정 중 문제가 발생했습니다.');
+      }
     } finally {
       setLoading(false);
     }
