@@ -468,7 +468,7 @@ export default function RecordWriteScreen({ navigation }) {
                         <Text style={styles.checkboxText}>친구와 함께 올랐어요!</Text>
                     </TouchableOpacity>
                     <Text style={styles.checkboxSubText}>
-                        {"(계단 이용이 x2로 측정됩니다.\n연구원에게 인증 사진을 보내주세요!)"}
+                        {"(계단 이용이 x2로 측정돼요! 오르락 단톡방에 친구와 함께한 계단 인증샷을 보내주세요! 작은 선물이 있을지도~? ​👯​)"}
                     </Text>
                     </View>
                 )}
