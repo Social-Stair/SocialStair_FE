@@ -20,7 +20,7 @@ import SuccessModal from '../components/SuccessModal';
 import { COLORS } from '../constants/colors';
 import { TYPOGRAPHY } from '../constants/typography';
 
-import { deleteJournal, getRecords, updateJournal } from '../api/socialStairApi';
+import { deleteJournal, deleteRecords, getRecords, updateJournal } from '../api/socialStairApi';
 
 export default function RecordDetailScreen({ route, navigation }) {
   const { journalData } = route.params || {};
@@ -34,8 +34,11 @@ export default function RecordDetailScreen({ route, navigation }) {
   const [startFloors, setStartFloors] = useState([]);
   const [endFloors, setEndFloors] = useState([]);
   const [withFriend, setWithFriend] = useState(false);
+  
+  // 삭제할 때 같이 보내주기 위해 매칭된 계단 기록의 ID를 저장할 State 추가
+  const [matchedRecordId, setMatchedRecordId] = useState(null);
 
-  // [수정 가능 데이터] - 성찰 일지와 만족도 (이건 journalData에 제대로 들어있음)
+  // [수정 가능 데이터] - 성찰 일지와 만족도
   const [satisfaction, setSatisfaction] = useState(journalData?.satisfaction || 1);
   const [journalText, setJournalText] = useState(journalData?.content || '');
   
@@ -52,14 +55,11 @@ export default function RecordDetailScreen({ route, navigation }) {
   useEffect(() => {
     const fetchMatchingStairsData = async () => {
       try {
-        // 1. 전체 계단 기록 불러오기
         const stairsResponse = await getRecords();
-        const targetDate = journalData?.date; // 예: "2025-04-07"
+        const targetDate = journalData?.date; 
 
         if (stairsResponse && stairsResponse.records && targetDate) {
-          // 2. 현재 일지와 날짜가 같은 계단 기록 찾기
           const matchedRecord = stairsResponse.records.find(r => {
-            // Timestamp를 YYYY-MM-DD 형태로 변환해서 비교
             if (!r.createdAt) return false;
             
             let recordDate = '';
@@ -71,11 +71,12 @@ export default function RecordDetailScreen({ route, navigation }) {
             return recordDate === targetDate;
           });
 
-          // 3. 매칭되는 계단 기록이 있다면 (계단을 이용한 날)
+          // 매칭되는 계단 기록이 있다면 (계단을 이용한 날)
           if (matchedRecord && matchedRecord.records && matchedRecord.records.length > 0) {
             setMoveMethod('계단');
+            // 나중에 삭제할 때를 위해 recordId를 저장해 둠
+            setMatchedRecordId(matchedRecord.recordId);
             
-            // 입력한 개수만큼 배열을 풀어서 세팅
             const times = matchedRecord.records.map(item => item.time || '시간 정보 없음');
             const starts = matchedRecord.records.map(item => String(item.fromFloor || '0'));
             const ends = matchedRecord.records.map(item => String(item.toFloor || '0'));
@@ -96,11 +97,20 @@ export default function RecordDetailScreen({ route, navigation }) {
     fetchMatchingStairsData();
   }, [journalData]);
 
-  // 실제 삭제 API를 호출하는 공통 함수
+  // 실제 삭제 로직 (일지 + 계단 기록 동시 삭제)
   const executeDelete = async () => {
     setLoading(true);
     try {
-      await deleteJournal(journalData.id);
+      // 계단 기록 ID가 존재한다면 (계단을 올랐던 날이라면), 일지와 계단 기록을 동시에 삭제
+      if (matchedRecordId) {
+        await Promise.all([
+          deleteJournal(journalData.id),
+          deleteRecords([matchedRecordId]) // 백엔드 요청대로 배열 형태로 감싸서 전송
+        ]);
+      } else {
+        // 엘리베이터나 출근 안 함 등으로 매칭된 계단 기록이 없을 땐 일지만 삭제
+        await deleteJournal(journalData.id);
+      }
       
       if (Platform.OS === 'web') {
         window.alert('일지가 삭제되었습니다.');
@@ -124,13 +134,11 @@ export default function RecordDetailScreen({ route, navigation }) {
   // 웹과 앱을 분리하여 알림창을 띄우는 삭제 버튼 핸들러
   const handleDelete = () => {
     if (Platform.OS === 'web') {
-      // 웹에서는 window.confirm 사용
       const isConfirmed = window.confirm('정말로 이 일지를 삭제하시겠어요?');
       if (isConfirmed) {
         executeDelete();
       }
     } else {
-      // 모바일 앱에서는 기존 Alert.alert 사용
       Alert.alert('기록 삭제', '정말로 이 일지를 삭제하시겠어요?', [
         { text: '취소', style: 'cancel' },
         { 

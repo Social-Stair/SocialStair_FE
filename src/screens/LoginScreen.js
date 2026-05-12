@@ -56,6 +56,31 @@ export default function LoginScreen({ navigation }) {
     try {
       const response = await login(email.trim(), password); 
       
+      // 1순위: 기기 저장소보다 먼저 '서버'에 이번 주 목표가 세팅되어 있는지 확인
+      let hasGoal = false;
+      try {
+        const goalData = await getGoal();
+        if (goalData && goalData.goalFloors) {
+          hasGoal = true;
+        }
+      } catch (goalError) {
+        console.log('목표 조회 에러:', goalError.response?.status);
+        hasGoal = false; 
+      }
+
+      // 목표가 이미 존재한다면 (기존 유저)
+      if (hasGoal) {
+        // 나중을 위해 '환영 화면 봤음' 처리만 해두고 곧바로 홈 화면으로 직행
+        if (Platform.OS === 'web') {
+          await AsyncStorage.setItem('hasSeenInitial', 'true');
+        } else {
+          await SecureStore.setItemAsync('hasSeenInitial', 'true');
+        }
+        navigation.replace('MainTab');
+        return;
+      }
+  
+      // 2순위: 목표가 없는 경우에만 신규 유저인지 확인
       let hasSeenInitial = null;
       if (Platform.OS === 'web') {
         hasSeenInitial = await AsyncStorage.getItem('hasSeenInitial');
@@ -69,20 +94,10 @@ export default function LoginScreen({ navigation }) {
         } else {
           await SecureStore.setItemAsync('hasSeenInitial', 'true');
         }
-        
+        // 환영 화면을 본 적 없으면 환영 화면으로 이동
         navigation.replace('Initial');
-        return;
-      }
-  
-      try {
-        const goalData = await getGoal();
-        if (!goalData || !goalData.goalFloors) {
-          navigation.replace('Start');
-        } else {
-          navigation.replace('MainTab');
-        }
-      } catch (goalError) {
-        console.log('목표 조회 에러:', goalError.response?.status);
+      } else {
+        // 환영 화면은 봤는데 목표를 아직 안 세웠으면 목표 설정으로 이동
         navigation.replace('Start'); 
       }
   

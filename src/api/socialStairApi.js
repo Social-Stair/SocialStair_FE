@@ -5,19 +5,16 @@ import apiClient from './client';
 
 /* --- 1. 인증 관련 API --- */
 
-// 로그인 API
 export const login = async (email, password) => {
   const response = await apiClient.post('https://login-3dgekfmjca-uc.a.run.app', { email, password });
   
   if (response.data.token) {
-    // 웹과 앱을 구분하여 로그인 정보 저장
     if (Platform.OS === 'web') {
       await AsyncStorage.setItem('userToken', response.data.token);
       await AsyncStorage.setItem('refreshToken', response.data.refreshToken);
       if(response.data.nickname) {
         await AsyncStorage.setItem('userNickname', response.data.nickname);
       }
-      // 로그인 시 userId도 함께 기기에 저장
       if(response.data.userId) {
         await AsyncStorage.setItem('userId', response.data.userId);
       }
@@ -27,7 +24,6 @@ export const login = async (email, password) => {
       if(response.data.nickname) {
         await SecureStore.setItemAsync('userNickname', response.data.nickname);
       }
-      // 로그인 시 userId도 함께 기기에 저장
       if(response.data.userId) {
         await SecureStore.setItemAsync('userId', response.data.userId);
       }
@@ -38,7 +34,6 @@ export const login = async (email, password) => {
 
 /* --- 2. 계단 기록 관련 API --- */
 
-// 계단 기록 입력 API
 export const recordStairs = async (records) => {
   const response = await apiClient.post('https://recordstairs-3dgekfmjca-uc.a.run.app', {
     records
@@ -46,7 +41,6 @@ export const recordStairs = async (records) => {
   return response.data; 
 };
 
-// 계단 기록 목록 조회 API
 export const getRecords = async (weekKey = '') => {
     const response = await apiClient.get('https://getrecords-3dgekfmjca-uc.a.run.app', {
       params: { weekKey }
@@ -54,7 +48,13 @@ export const getRecords = async (weekKey = '') => {
     return response.data;
 };
 
-// 주간 목표 가져오기
+export const deleteRecords = async (recordIds) => {
+    const response = await apiClient.delete('https://deleterecords-3dgekfmjca-uc.a.run.app', {
+        data: { recordIds } 
+    });
+    return response.data; 
+};
+
 export const getGoal = async (weekKey = '') => {
     const response = await apiClient.get('https://getgoal-3dgekfmjca-uc.a.run.app', {
       params: { weekKey }
@@ -62,7 +62,6 @@ export const getGoal = async (weekKey = '') => {
     return response.data; 
 };
 
-// 성찰 일지 작성 API
 export const createJournal = async (content, satisfaction) => {
   const response = await apiClient.post('https://createjournal-3dgekfmjca-uc.a.run.app', {
     content, 
@@ -71,7 +70,6 @@ export const createJournal = async (content, satisfaction) => {
   return response.data; 
 };
 
-// 회원가입 API 
 export const registerUser = async (email, password, nickname, floor) => {
   const response = await apiClient.post('https://register-3dgekfmjca-uc.a.run.app', {
     email,
@@ -80,7 +78,6 @@ export const registerUser = async (email, password, nickname, floor) => {
     floor: Number(floor) 
   });
   
-  // API 명세서에 맞춰 회원가입 직후에도 토큰과 userId를 저장하여 자동 로그인 처리
   if (response.data.token) {
     if (Platform.OS === 'web') {
       await AsyncStorage.setItem('userToken', response.data.token);

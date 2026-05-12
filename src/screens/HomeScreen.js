@@ -12,6 +12,7 @@ import {
 
 import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
@@ -28,7 +29,6 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// 화면 이동을 위해 navigation 속성 추가
 export default function HomeScreen({ navigation }) {
   const [nickname, setNickname] = useState('사용자');
   const [goalData, setGoalData] = useState({ currentFloors: 0, goalFloors: 0, achievementRate: 0 });
@@ -36,7 +36,6 @@ export default function HomeScreen({ navigation }) {
   const [lastWeekRate, setLastWeekRate] = useState(0); 
   const [notifications, setNotifications] = useState([]);
 
-  // 시간 변환 함수
   const getRelativeTime = (timestamp) => {
     const now = Date.now();
     const diffInSeconds = Math.floor((now - timestamp) / 1000);
@@ -52,7 +51,6 @@ export default function HomeScreen({ navigation }) {
     return `${diffInWeeks}주 전`;
   };
 
-  // 서버에서 알림 목록을 불러오는 함수 (재사용을 위해 분리)
   const fetchNotifications = useCallback(async () => {
     try {
       const notiData = await getNotificationsData(20); 
@@ -78,12 +76,10 @@ export default function HomeScreen({ navigation }) {
     }
   }, []);
 
-  // 화면에 포커스 될 때마다 홈 데이터 + 알림 목록 + 연속 기록 + 지난주 달성도 갱신
   useFocusEffect(
     useCallback(() => {
       const fetchHomeData = async () => {
         try {
-          // 1. 기본 홈 데이터 (이번 주 누적, 목표 달성률 등)
           let savedName = null;
           if (Platform.OS === 'web') {
             savedName = await AsyncStorage.getItem('userNickname');
@@ -105,7 +101,6 @@ export default function HomeScreen({ navigation }) {
             }
           }
 
-          // API 명세서에 맞는 주차 키(weekKey) 생성
           const getISOWeekKey = (date) => {
             const target = new Date(date.valueOf());
             const dayNr = (date.getDay() + 6) % 7;
@@ -122,9 +117,8 @@ export default function HomeScreen({ navigation }) {
           const today = new Date();
           const lastWeekDate = new Date(today.valueOf());
           lastWeekDate.setDate(today.getDate() - 7);
-          const lastWeekKey = getISOWeekKey(lastWeekDate); // 지난 주 weekKey 생성
+          const lastWeekKey = getISOWeekKey(lastWeekDate);
 
-          // 2. 지난 주 달성도(%) 가져오기
           try {
             const lastWeekGoalData = await getGoal(lastWeekKey);
             if (lastWeekGoalData && lastWeekGoalData.achievementRate) {
@@ -133,12 +127,10 @@ export default function HomeScreen({ navigation }) {
               setLastWeekRate(0);
             }
           } catch (error) {
-            setLastWeekRate(0); // 지난 주 기록이 없거나 에러면 0%
+            setLastWeekRate(0);
           }
 
-          // 3. 연속 기록(Streak) 계산하기
           try {
-            // 이번 주 기록과 지난 주 기록을 동시에 가져와서 합침 (최대 14일 치 연속 확인)
             const [currentWeekData, lastWeekData] = await Promise.all([
               getRecords().catch(() => ({ records: [] })),
               getRecords(lastWeekKey).catch(() => ({ records: [] }))
@@ -149,7 +141,6 @@ export default function HomeScreen({ navigation }) {
               ...(lastWeekData.records || [])
             ];
 
-            // KST 기준 'YYYY-MM-DD' 고유 날짜 추출
             const recordDates = new Set(allRecords.map(r => {
               const ts = r.createdAt?._seconds ? r.createdAt._seconds * 1000 : new Date(r.createdAt).getTime();
               const d = new Date(ts);
@@ -157,15 +148,14 @@ export default function HomeScreen({ navigation }) {
             }));
 
             let currentStreak = 0;
-            const checkDate = new Date(); // 오늘부터 확인 시작
+            const checkDate = new Date(); 
             
             const getFormattedDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
             if (recordDates.has(getFormattedDate(checkDate))) {
-              currentStreak = 1; // 오늘 기록이 있으면 무조건 1부터 시작
+              currentStreak = 1; 
               checkDate.setDate(checkDate.getDate() - 1);
             } else {
-              // 오늘 기록이 아직 없으면 '어제'부터 기록이 이어지고 있는지 확인
               checkDate.setDate(checkDate.getDate() - 1);
               if (recordDates.has(getFormattedDate(checkDate))) {
                 currentStreak = 1;
@@ -173,14 +163,13 @@ export default function HomeScreen({ navigation }) {
               }
             }
 
-            // 어제(또는 그 이전)부터 과거로 거슬러 올라가며 연속 기록 확인
             if (currentStreak > 0) {
               while (true) {
                 if (recordDates.has(getFormattedDate(checkDate))) {
                   currentStreak++;
                   checkDate.setDate(checkDate.getDate() - 1);
                 } else {
-                  break; // 이가 빠진 날을 발견하면 루프 종료
+                  break; 
                 }
               }
             }
@@ -188,12 +177,11 @@ export default function HomeScreen({ navigation }) {
             setStreak(currentStreak);
 
           } catch (error) {
-            console.error("연속 기록 계산 실패:", error);
             setStreak(0);
           }
 
         } catch (error) {
-          console.error("홈 데이터 전체 새로고침 실패:", error);
+          console.error("홈 데이터 새로고침 실패:", error);
         }
       };
 
@@ -205,54 +193,73 @@ export default function HomeScreen({ navigation }) {
 
   useEffect(() => {
     const registerForPushNotificationsAsync = async () => {
-      if (Device.isDevice) {
+      // 1. [공통] userId 복구 로직 (웹과 앱 모두 반드시 실행되어야 함)
+      let userId = null;
+      if (Platform.OS === 'web') {
+        userId = await AsyncStorage.getItem('userId');
+      } else {
+        userId = await SecureStore.getItemAsync('userId');
+      }
+      
+      if (!userId) {
         try {
-          const { status: existingStatus } = await Notifications.getPermissionsAsync();
-          let finalStatus = existingStatus;
-          if (existingStatus !== 'granted') {
-            const { status } = await Notifications.requestPermissionsAsync();
-            finalStatus = status;
-          }
-          if (finalStatus !== 'granted') return;
-
-          const tokenData = await Notifications.getExpoPushTokenAsync().catch(() => null);
-          if (tokenData && tokenData.data) {
-            const token = tokenData.data;
+          const goalData = await getGoal(); 
+          if (goalData && goalData.userId) {
+            userId = goalData.userId;
             
-            let userId = null;
             if (Platform.OS === 'web') {
-              userId = await AsyncStorage.getItem('userId');
+              await AsyncStorage.setItem('userId', userId);
             } else {
-              userId = await SecureStore.getItemAsync('userId');
+              await SecureStore.setItemAsync('userId', userId);
             }
-            
-            if (!userId) {
-              try {
-                // 이미 홈에서 사용 중인 getGoal API를 한 번 더 활용
-                const goalData = await getGoal(); 
-                if (goalData && goalData.userId) {
-                  userId = goalData.userId;
-                  
-                  
-                  if (Platform.OS === 'web') {
-                    await AsyncStorage.setItem('userId', userId);
-                  } else {
-                    await SecureStore.setItemAsync('userId', userId);
-                  }
-                  console.log('userId 자동 복구 성공:', userId);
-                }
-              } catch (e) {
-                console.log('userId 복구 실패:', e);
-              }
-            }
-            
-            if (userId) {
-              await updateFcmToken(userId, token);
-            }
+            console.log('userId 자동 복구 성공:', userId);
           }
         } catch (e) {
-          console.log('푸시 알림 설정 중 에러 발생:', e);
+          console.log('userId 복구 실패:', e);
         }
+      }
+
+      // 2. [앱 전용] 웹 환경이 아닐 때(앱일 때)만 푸시 토큰을 발급
+      if (Platform.OS !== 'web') {
+        if (Device.isDevice) {
+          try {
+            const { status: existingStatus } = await Notifications.getPermissionsAsync();
+            let finalStatus = existingStatus;
+            if (existingStatus !== 'granted') {
+              const { status } = await Notifications.requestPermissionsAsync();
+              finalStatus = status;
+            }
+            if (finalStatus !== 'granted') {
+               console.log("알림 권한이 거부되었습니다.");
+               return;
+            }
+  
+            const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
+  
+            const tokenData = await Notifications.getExpoPushTokenAsync({
+              projectId: projectId, 
+            }).catch((e) => {
+              console.error('푸시 토큰 발급 에러(원인 파악용):', e);
+              return null;
+            });
+  
+            if (tokenData && tokenData.data) {
+              const token = tokenData.data;
+              console.log('발급된 푸시 토큰:', token);
+              
+              if (userId) {
+                await updateFcmToken(userId, token);
+                console.log('서버로 푸시 토큰 전송 완료');
+              }
+            }
+          } catch (e) {
+            console.log('푸시 알림 설정 중 전체 에러:', e);
+          }
+        } else {
+          console.log("에뮬레이터(가상기기)에서는 푸시 알림 테스트가 불가능합니다.");
+        }
+      } else {
+        console.log("웹(Web) 환경에서는 푸시 알림 토큰 발급을 건너뜁니다.");
       }
     };
 
@@ -271,13 +278,11 @@ export default function HomeScreen({ navigation }) {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
-        {/* 상단 환영 인사 영역 */}
         <View style={styles.headerContainer}>
           <Text style={styles.subHeader}>어서오세요, {nickname}님</Text>
           <Text style={styles.mainHeader}>오늘도 계단 한 층 더!</Text>
         </View>
 
-        {/* 주간 목표 카드 (사다리꼴 적용됨) */}
         <View style={styles.goalCard}>
           <View style={styles.accumulateContainer}>
             <Text style={styles.accumulateLabel}>이번 주 누적</Text>
@@ -303,7 +308,6 @@ export default function HomeScreen({ navigation }) {
           </View>
         </View>
 
-        {/* 통계 카드 */}
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
             <View style={styles.statHeader}>
@@ -332,7 +336,6 @@ export default function HomeScreen({ navigation }) {
           </View>
         </View>
 
-        {/* 알림 리스트 영역 */}
         <View style={styles.notificationSection}>
           <Text style={styles.sectionTitle}>성찰 일지 알림</Text>
           <View style={styles.notificationBox}>
@@ -366,7 +369,6 @@ export default function HomeScreen({ navigation }) {
           </View>
         </View>
 
-        {/* 새롭게 추가된 목표 재설정 버튼 영역 */}
         <TouchableOpacity
           style={styles.resetGoalButton}
           onPress={() => navigation.navigate('Start')}
@@ -420,7 +422,6 @@ const styles = StyleSheet.create({
   notiDescription: { fontFamily: 'Pretendard-Medium', color: COLORS.gray, fontSize: 13, lineHeight: 18, letterSpacing: 13 * -0.025 },
   divider: { height: 1, backgroundColor: COLORS.border, marginVertical: 16 },
   
-  // 목표 재설정 버튼 스타일 추가
   resetGoalButton: { 
     flexDirection: 'row', 
     alignItems: 'center', 
