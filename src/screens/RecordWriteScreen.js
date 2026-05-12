@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
 import { Feather } from '@expo/vector-icons';
@@ -156,7 +156,6 @@ export default function RecordWriteScreen({ navigation }) {
                     withColleague: withFriend
                 }));
 
-                // Promise.all을 사용해서 두 개의 API를 동시에 전송
                 const [recordResponse] = await Promise.all([
                     recordStairs(recordsPayload),
                     createJournal(journalText, parseInt(satisfaction, 10))
@@ -416,7 +415,7 @@ export default function RecordWriteScreen({ navigation }) {
                 </View>
 
                 <View style={[styles.inputGroup, { zIndex: 1 }]}>
-                <Text style={styles.sectionTitle}>다음 이동 시 계단을 이용할 의향이 얼마나 있습니까?</Text>
+                <Text style={styles.sectionTitle}>다음 이동 시 계단을 이용할 의향이 얼마나 있으신가요?</Text>
                 <View style={styles.satisfactionWrapper}>
                     <Slider
                     style={styles.slider}
@@ -444,9 +443,13 @@ export default function RecordWriteScreen({ navigation }) {
 
                 <View style={[styles.inputGroup, { zIndex: 1 }]}>
                 <Text style={styles.sectionTitle}>성찰 일지</Text>
+                
+                <Text style={styles.sectionDescription}>
+                  이 방법을 선택한 가장 큰 이유는 무엇인가요? 선택 이후 어떤 느낌이 드는지 자유롭게 적어주세요!
+                </Text>
                 <TextInput
                     style={[styles.journalInput, isNotWorking && styles.disabledInput]}
-                    placeholder="이 방법을 선택한 가장 큰 이유는 무엇인가요? 선택 이후 어떤 느낌이 드는지 자유롭게 적어주세요!"
+                    placeholder="내용을 입력해주세요."
                     placeholderTextColor={COLORS.gray}
                     multiline
                     textAlignVertical="top"
@@ -468,7 +471,7 @@ export default function RecordWriteScreen({ navigation }) {
                         <Text style={styles.checkboxText}>친구와 함께 올랐어요!</Text>
                     </TouchableOpacity>
                     <Text style={styles.checkboxSubText}>
-                        {"(계단 이용이 x2로 측정돼요! 오르락 단톡방에 친구와 함께한 계단 인증샷을 보내주세요! 작은 선물이 있을지도~? ​👯​)"}
+                        {"(계단 이용이 x2로 측정돼요! 오르락 단톡방에 친구와 함께한 계단 인증샷을 보내주세요!​)"}
                     </Text>
                     </View>
                 )}
@@ -510,6 +513,7 @@ const styles = StyleSheet.create({
   formContainer: { gap: 24 },
   inputGroup: { gap: 10 },
   sectionTitle: { ...TYPOGRAPHY.sectionTitle },
+  sectionDescription: { fontFamily: 'Pretendard-Medium', fontSize: 13, color: COLORS.gray, marginTop: -4, lineHeight: 18, letterSpacing: 13 * -0.025 },
   
   dropdownBox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 48, backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, paddingHorizontal: 16 },
   dropdownText: { fontFamily: 'Pretendard-Medium', fontSize: 14, color: COLORS.gray, letterSpacing: 14 * -0.025 },

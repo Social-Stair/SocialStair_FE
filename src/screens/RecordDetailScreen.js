@@ -247,7 +247,7 @@ export default function RecordDetailScreen({ route, navigation }) {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.sectionTitle}>이동 방법은 나의 의지에 따른 선택이었나요?</Text>
+              <Text style={styles.sectionTitle}>다음 이동 시 계단을 이용할 의향이 얼마나 있으신가요?</Text>
               <View style={styles.satisfactionWrapper}>
                 <Slider
                   style={styles.slider}
@@ -270,8 +270,14 @@ export default function RecordDetailScreen({ route, navigation }) {
 
             <View style={styles.inputGroup}>
               <Text style={styles.sectionTitle}>성찰 일지</Text>
+              
+              <Text style={styles.sectionDescription}>
+                이 방법을 선택한 가장 큰 이유는 무엇인가요? 선택 이후 어떤 느낌이 드는지 자유롭게 적어주세요!
+              </Text>
               <TextInput
                 style={styles.journalInput}
+                placeholder="내용을 입력해주세요."
+                placeholderTextColor={COLORS.gray}
                 multiline
                 textAlignVertical="top"
                 value={journalText}
@@ -327,6 +333,7 @@ const styles = StyleSheet.create({
   formContainer: { gap: 24 },
   inputGroup: { gap: 10 },
   sectionTitle: { ...TYPOGRAPHY.sectionTitle },
+  sectionDescription: { fontFamily: 'Pretendard-Medium', fontSize: 13, color: COLORS.gray, marginTop: -4, lineHeight: 18, letterSpacing: 13 * -0.025 },
   
   disabledDropdownBox: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
