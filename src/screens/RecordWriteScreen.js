@@ -51,7 +51,7 @@ export default function RecordWriteScreen({ navigation }) {
     const [showConfetti, setShowConfetti] = useState(true);
 
     const isStairs = moveMethod === '계단';
-    const isNotWorking = moveMethod === '출근 안 함';
+    const isNotWorking = moveMethod === '출근 안 함/퇴근';
 
     const showCustomAlert = (title, message) => {
         if (Platform.OS === 'web') {
@@ -66,7 +66,8 @@ export default function RecordWriteScreen({ navigation }) {
         setIsDropdownOpen(false);
         setOpenDropdownInfo(null);
         
-        if (method === '출근 안 함') {
+        
+        if (method === '출근 안 함/퇴근') {
             setRecordTimes(['']);
             setStartFloors(['']);
             setEndFloors(['']);
@@ -182,7 +183,8 @@ export default function RecordWriteScreen({ navigation }) {
                 setShowConfetti(false);
                 setAchievementRate(0); 
 
-            } else if (moveMethod === '출근 안 함') {
+            
+            } else if (moveMethod === '출근 안 함/퇴근') {
                 await skipToday();
                 
                 setModalTitle('일지 작성 완료');
@@ -275,7 +277,8 @@ export default function RecordWriteScreen({ navigation }) {
 
                 {isDropdownOpen && (
                     <View style={styles.dropdownList}>
-                    {['계단', '엘리베이터', '출근 안 함'].map((method) => (
+                    
+                    {['계단', '엘리베이터', '출근 안 함/퇴근'].map((method) => (
                         <TouchableOpacity 
                         key={method} 
                         style={styles.dropdownItem}

@@ -1,6 +1,5 @@
 import React from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-// 1. 폭죽 이펙트 라이브러리 불러오기
 import ConfettiCannon from 'react-native-confetti-cannon';
 
 import { COLORS } from '../constants/colors';
@@ -11,8 +10,8 @@ export default function SuccessModal({
   achievementRate, 
   title, 
   subText,
-  mainText,      // 추가: 모달 중앙 메인 텍스트 
-  showConfetti   // 추가: 폭죽 표시 여부
+  mainText,      
+  showConfetti   
 }) {
   return (
     <Modal
@@ -25,10 +24,8 @@ export default function SuccessModal({
       <View style={styles.modalBackdrop}>
         <View style={styles.modalContainer}>
           
-          {/* 폭죽은 visible이고 showConfetti가 true일 때만 터짐 */}
           {visible && showConfetti && (
             <>
-              {/* 왼쪽 대포 */}
               <ConfettiCannon
                 count={35}
                 origin={{x: 10, y: 20}} 
@@ -37,7 +34,6 @@ export default function SuccessModal({
                 explosionSpeed={350}
                 fallSpeed={2000}
               />
-              {/* 오른쪽 대포 */}
               <ConfettiCannon
                 count={35} 
                 origin={{x: 310, y: 20}} 
@@ -53,15 +49,17 @@ export default function SuccessModal({
             <View style={styles.modalTitleGroup}>
               <Text style={styles.modalTitle}>{title}</Text>
               
-              {/* mainText가 있으면 그걸 띄우고, 없으면 기본 퍼센트 텍스트 띄움 */}
               <Text style={styles.modalMainText}>
                 {mainText ? mainText : (
-                  <>벌써 주간 목표의 <Text style={styles.modalHighlightText}>{achievementRate}%</Text>를{'\n'}달성했습니다! 🎉</>
+                  achievementRate >= 100 ? (
+                    <>주간 목표의 <Text style={styles.modalHighlightText}>{achievementRate}%</Text>를{'\n'}달성했습니다! 🎉</>
+                  ) : (
+                    <>벌써 주간 목표의 <Text style={styles.modalHighlightText}>{achievementRate}%</Text>를{'\n'}달성했습니다! 🎉</>
+                  )
                 )}
               </Text>
             </View>
             
-            {/* subText가 있을 때만 렌더링 */}
             {subText ? (
               <Text style={styles.modalSubText}>
                 {subText}

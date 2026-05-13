@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import React from 'react';
+import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/colors';
 
@@ -20,7 +21,8 @@ export default function MainTab() {
         
         // 탭 바 스타일 설정
         tabBarStyle: {
-          height: 64 + insets.bottom, 
+          // 웹 환경에서는 텍스트가 잘리지 않도록 높이를 84로 넉넉하게 늘려줌
+          height: Platform.OS === 'web' ? 84 : 64 + insets.bottom, 
           backgroundColor: COLORS.white,
           borderTopLeftRadius: 24,
           borderTopRightRadius: 24,
@@ -35,7 +37,8 @@ export default function MainTab() {
           shadowOpacity: 0.05,
           shadowRadius: 10,
           
-          paddingBottom: insets.bottom > 0 ? insets.bottom : 10, 
+          // 웹 환경에서는 글씨 아래쪽 공간도 조금 더 확보
+          paddingBottom: Platform.OS === 'web' ? 14 : (insets.bottom > 0 ? insets.bottom : 10), 
           paddingTop: 10,
         },
         
