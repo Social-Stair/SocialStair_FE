@@ -25,33 +25,30 @@ import { deleteJournal, deleteRecords, getRecords, updateJournal } from '../api/
 export default function RecordDetailScreen({ route, navigation }) {
   const { journalData } = route.params || {};
 
-  // 데이터 로딩 상태
   const [isLoadingRecords, setIsLoadingRecords] = useState(true);
 
-  // [조회 전용 데이터] - 서버에서 불러와서 세팅할 상태들
-  const [moveMethod, setMoveMethod] = useState('엘리베이터/출근 안 함'); // 기본값
+  const [moveMethod, setMoveMethod] = useState(''); 
   const [recordTimes, setRecordTimes] = useState([]); 
   const [startFloors, setStartFloors] = useState([]);
   const [endFloors, setEndFloors] = useState([]);
   const [withFriend, setWithFriend] = useState(false);
   
-  // 삭제할 때 같이 보내주기 위해 매칭된 계단 기록의 ID를 저장할 State 추가
   const [matchedRecordId, setMatchedRecordId] = useState(null);
 
-  // [수정 가능 데이터] - 성찰 일지와 만족도
   const [satisfaction, setSatisfaction] = useState(journalData?.satisfaction || 1);
   const [journalText, setJournalText] = useState(journalData?.content || '');
   
   const [isSuccessModalVisible, setSuccessModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const isNotWorking = moveMethod === '엘리베이터/출근 안 함';
+  const isStairs = moveMethod === '계단 이용';
+  const isTimeFloorDisabled = moveMethod === '해당 시간대 이동 없음' || moveMethod === '출근 안 함/퇴근';
+  const isReadOnlyMode = moveMethod === '해당 시간대 이동 없음' || moveMethod === '출근 안 함/퇴근';
 
   const hasChanges = 
     satisfaction !== journalData?.satisfaction ||
     journalText !== journalData?.content;
 
-  // 화면이 열릴 때 계단 기록 API를 찔러서 현재 일지 날짜와 매칭하기
   useEffect(() => {
     const fetchMatchingStairsData = async () => {
       try {
@@ -59,25 +56,49 @@ export default function RecordDetailScreen({ route, navigation }) {
         const targetDate = journalData?.date; 
 
         if (stairsResponse && stairsResponse.records && targetDate) {
-          const matchedRecord = stairsResponse.records.find(r => {
+          
+          let journalTime = 0;
+          if (journalData?.createdAt) {
+            journalTime = journalData.createdAt._seconds 
+              ? journalData.createdAt._seconds * 1000 
+              : new Date(journalData.createdAt).getTime();
+          }
+
+          const sameDayRecords = stairsResponse.records.filter(r => {
             if (!r.createdAt) return false;
-            
-            let recordDate = '';
-            if (r.createdAt._seconds) {
-              recordDate = new Date(r.createdAt._seconds * 1000).toISOString().split('T')[0];
-            } else {
-              recordDate = new Date(r.createdAt).toISOString().split('T')[0];
-            }
-            return recordDate === targetDate;
+            let recordTime = r.createdAt._seconds 
+              ? r.createdAt._seconds * 1000 
+              : new Date(r.createdAt).getTime();
+            const rDate = new Date(recordTime).toISOString().split('T')[0];
+            return rDate === targetDate;
           });
 
-          // 매칭되는 계단 기록이 있다면 (계단을 이용한 날)
+          let matchedRecord = null;
+
+          if (sameDayRecords.length > 0) {
+            if (journalTime > 0) {
+              matchedRecord = sameDayRecords.reduce((prev, curr) => {
+                let prevTime = prev.createdAt._seconds ? prev.createdAt._seconds * 1000 : new Date(prev.createdAt).getTime();
+                let currTime = curr.createdAt._seconds ? curr.createdAt._seconds * 1000 : new Date(curr.createdAt).getTime();
+                return Math.abs(currTime - journalTime) < Math.abs(prevTime - journalTime) ? curr : prev;
+              });
+            } else {
+              matchedRecord = sameDayRecords[0];
+            }
+          }
+
           if (matchedRecord && matchedRecord.records && matchedRecord.records.length > 0) {
-            setMoveMethod('계단');
-            // 나중에 삭제할 때를 위해 recordId를 저장해 둠
+            const backendType = matchedRecord.records[0].type || '계단';
+            
+            if (backendType === '계단') setMoveMethod('계단 이용');
+            else if (backendType === '엘리베이터') setMoveMethod('엘리베이터 이용');
+            else if (backendType === '이동없음') setMoveMethod('해당 시간대 이동 없음');
+            else if (backendType === '출근안함') setMoveMethod('출근 안 함/퇴근');
+            else setMoveMethod(backendType);
+
             setMatchedRecordId(matchedRecord.recordId);
             
-            const times = matchedRecord.records.map(item => item.time || '시간 정보 없음');
+            const times = matchedRecord.records.map(item => item.time || '00:00');
             const starts = matchedRecord.records.map(item => String(item.fromFloor || '0'));
             const ends = matchedRecord.records.map(item => String(item.toFloor || '0'));
             
@@ -85,6 +106,8 @@ export default function RecordDetailScreen({ route, navigation }) {
             setStartFloors(starts);
             setEndFloors(ends);
             setWithFriend(matchedRecord.records[0]?.withColleague ?? false);
+          } else {
+             setMoveMethod('기록 없음');
           }
         }
       } catch (error) {
@@ -97,18 +120,15 @@ export default function RecordDetailScreen({ route, navigation }) {
     fetchMatchingStairsData();
   }, [journalData]);
 
-  // 실제 삭제 로직 (일지 + 계단 기록 동시 삭제)
   const executeDelete = async () => {
     setLoading(true);
     try {
-      // 계단 기록 ID가 존재한다면 (계단을 올랐던 날이라면), 일지와 계단 기록을 동시에 삭제
       if (matchedRecordId) {
         await Promise.all([
           deleteJournal(journalData.id),
-          deleteRecords([matchedRecordId]) // 백엔드 요청대로 배열 형태로 감싸서 전송
+          deleteRecords([matchedRecordId]) 
         ]);
       } else {
-        // 엘리베이터나 출근 안 함 등으로 매칭된 계단 기록이 없을 땐 일지만 삭제
         await deleteJournal(journalData.id);
       }
       
@@ -131,7 +151,6 @@ export default function RecordDetailScreen({ route, navigation }) {
     }
   };
 
-  // 웹과 앱을 분리하여 알림창을 띄우는 삭제 버튼 핸들러
   const handleDelete = () => {
     if (Platform.OS === 'web') {
       const isConfirmed = window.confirm('정말로 이 일지를 삭제하시겠어요?');
@@ -200,13 +219,12 @@ export default function RecordDetailScreen({ route, navigation }) {
               </View>
             </View>
 
-            {/* 서버에서 불러온 여러 개의 시간 데이터 렌더링 */}
             <View style={styles.inputGroup}>
               <Text style={styles.sectionTitle}>언제 오르셨나요?</Text>
               {isLoadingRecords ? (
                 <View style={styles.disabledInputBox}><ActivityIndicator color={COLORS.primary} size="small" /></View>
-              ) : recordTimes.length === 0 ? (
-                <View style={styles.disabledInputBox}><Text style={[styles.disabledText, { opacity: 0.5 }]}>기록 없음</Text></View>
+              ) : (isTimeFloorDisabled || recordTimes.length === 0) ? (
+                <View style={styles.disabledInputBox}><Text style={[styles.disabledText, { opacity: 0.5 }]}>-</Text></View>
               ) : (
                 recordTimes.map((time, index) => (
                   <View key={index} style={[styles.disabledInputBox, index > 0 && { marginTop: 8 }]}>
@@ -216,7 +234,6 @@ export default function RecordDetailScreen({ route, navigation }) {
               )}
             </View>
 
-            {/* 서버에서 불러온 여러 개의 층수 데이터 렌더링 */}
             <View style={styles.inputGroup}>
               <Text style={styles.sectionTitle}>몇 층부터 몇 층까지 오르셨나요?</Text>
               {isLoadingRecords ? (
@@ -225,7 +242,7 @@ export default function RecordDetailScreen({ route, navigation }) {
                   <Text style={styles.arrowText}>→</Text>
                   <View style={styles.disabledFloorBox}><ActivityIndicator color={COLORS.primary} size="small" /></View>
                 </View>
-              ) : recordTimes.length === 0 ? (
+              ) : (isTimeFloorDisabled || recordTimes.length === 0) ? (
                 <View style={styles.floorRow}>
                   <View style={styles.disabledFloorBox}><Text style={[styles.disabledText, { opacity: 0.5 }]}>-</Text></View>
                   <Text style={styles.arrowText}>→</Text>
@@ -235,7 +252,9 @@ export default function RecordDetailScreen({ route, navigation }) {
                 recordTimes.map((_, index) => (
                   <View key={index} style={[styles.floorRow, index > 0 && { marginTop: 12 }]}>
                     <View style={styles.disabledFloorBox}>
-                      <Text style={styles.disabledText}>{startFloors[index]}층</Text>
+                      <Text style={styles.disabledText}>
+                        {startFloors[index] === '-1' ? 'B1 (지하1층)' : `${startFloors[index]}층`}
+                      </Text>
                     </View>
                     <Text style={styles.arrowText}>→</Text>
                     <View style={styles.disabledFloorBox}>
@@ -258,7 +277,8 @@ export default function RecordDetailScreen({ route, navigation }) {
                   onValueChange={(val) => setSatisfaction(val)}
                   minimumTrackTintColor={COLORS.primary}
                   maximumTrackTintColor="#DBDEE6"
-                  thumbTintColor={COLORS.primary}
+                  thumbTintColor={isReadOnlyMode ? 'transparent' : COLORS.primary}
+                  disabled={isReadOnlyMode}
                 />
                 <View style={styles.satisfactionDotsRow}>
                   {[1, 2, 3, 4, 5, 6, 7].map((num) => (
@@ -275,16 +295,17 @@ export default function RecordDetailScreen({ route, navigation }) {
                 이 방법을 선택한 가장 큰 이유는 무엇인가요? 선택 이후 어떤 느낌이 드는지 자유롭게 적어주세요!
               </Text>
               <TextInput
-                style={styles.journalInput}
+                style={[styles.journalInput, isReadOnlyMode && styles.disabledInput]} 
                 placeholder="내용을 입력해주세요."
                 placeholderTextColor={COLORS.gray}
                 multiline
                 textAlignVertical="top"
                 value={journalText}
                 onChangeText={setJournalText}
+                editable={!isReadOnlyMode} 
               />
               
-              {moveMethod === '계단' && (
+              {isStairs && (
                 <View style={styles.disabledCheckboxRow}>
                   <View style={[styles.checkbox, withFriend && styles.checkboxActive]}>
                     {withFriend && <Feather name="check" size={12} color={COLORS.white} />}
@@ -302,9 +323,9 @@ export default function RecordDetailScreen({ route, navigation }) {
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={[styles.editButton, (!hasChanges || loading) && { backgroundColor: COLORS.gray }]} 
+              style={[styles.editButton, (!hasChanges || loading || isReadOnlyMode) && { backgroundColor: COLORS.gray }]} 
               onPress={handleEdit}
-              disabled={!hasChanges || loading}
+              disabled={!hasChanges || loading || isReadOnlyMode}
             >
               {loading ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.editButtonText}>수정 완료</Text>}
             </TouchableOpacity>
@@ -352,6 +373,7 @@ const styles = StyleSheet.create({
   journalInput: {
     height: 120, backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, padding: 16, fontFamily: 'Pretendard-Medium', fontSize: 14, color: COLORS.black,
   },
+  disabledInput: { backgroundColor: '#DBDEE6' },
   
   satisfactionWrapper: { marginTop: 10 },
   slider: { width: '100%', height: 40 },

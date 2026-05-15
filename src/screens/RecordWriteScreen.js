@@ -66,7 +66,7 @@ export default function RecordWriteScreen({ navigation }) {
         setIsDropdownOpen(false);
         setOpenDropdownInfo(null);
         
-        if (method === '출근 안 함/퇴근' || method === '해당 시간대 이동 없음') {
+        if (method === '출근 안 함/퇴근') {
             setRecordTimes(['']);
             setStartFloors(['']);
             setEndFloors(['']);
@@ -74,6 +74,14 @@ export default function RecordWriteScreen({ navigation }) {
             setJournalText('');
             setWithFriend(false);
         } 
+        else if (method === '해당 시간대 이동 없음') {
+            setRecordTimes(['']);
+            setStartFloors(['']);
+            setEndFloors(['']);
+            setSatisfaction(1);
+            setJournalText('해당 시간대 이동이 없습니다.');
+            setWithFriend(false);
+        }
         else if (method === '엘리베이터 이용') {
             setRecordTimes(['']);
             setStartFloors(['']);
@@ -148,22 +156,34 @@ export default function RecordWriteScreen({ navigation }) {
         setLoading(true);
 
         try {
-            if (moveMethod === '계단 이용') {
-                const recordsPayload = recordTimes.map((time, index) => ({
-                    fromFloor: startFloors[index] === 'B1' ? -1 : parseInt(startFloors[index], 10),
-                    toFloor: parseInt(endFloors[index], 10),
-                    time: time, 
-                    withColleague: withFriend
-                }));
+            let backendType = '계단';
+            if (moveMethod === '계단 이용') backendType = '계단';
+            else if (moveMethod === '엘리베이터 이용') backendType = '엘리베이터';
+            else if (moveMethod === '해당 시간대 이동 없음') backendType = '이동없음';
+            else if (moveMethod === '출근 안 함/퇴근') backendType = '출근안함';
 
+            const recordsPayload = recordTimes.map((time, index) => {
+                let fFloor = startFloors[index] === 'B1' ? -1 : parseInt(startFloors[index], 10);
+                let tFloor = parseInt(endFloors[index], 10);
+                
+                return {
+                    fromFloor: isNaN(fFloor) ? 1 : fFloor, 
+                    toFloor: isNaN(tFloor) ? 1 : tFloor,
+                    time: time.trim() ? time : "00:00",
+                    type: backendType, 
+                    withColleague: moveMethod === '계단 이용' ? withFriend : false
+                };
+            });
+
+            if (moveMethod === '계단 이용') {
                 const [recordResponse] = await Promise.all([
                     recordStairs(recordsPayload),
                     createJournal(journalText, parseInt(satisfaction, 10))
                 ]);
 
-                setAchievementRate(recordResponse.achievementRate || 0);
+                setAchievementRate(recordResponse?.achievementRate || 0);
 
-                if (recordResponse.milestone) {
+                if (recordResponse?.milestone) {
                     setModalTitle(recordResponse.milestone.title);
                     setModalSubText(recordResponse.milestone.body);
                 } else {
@@ -174,7 +194,10 @@ export default function RecordWriteScreen({ navigation }) {
                 setShowConfetti(true);
 
             } else if (moveMethod === '엘리베이터 이용') {
-                await createJournal(journalText, parseInt(satisfaction, 10));
+                await Promise.all([
+                    recordStairs(recordsPayload), 
+                    createJournal(journalText, parseInt(satisfaction, 10))
+                ]);
                 
                 setModalTitle('일지 작성 완료');
                 setModalMainText('성찰 일지가 기록되었습니다 📥');
@@ -182,15 +205,26 @@ export default function RecordWriteScreen({ navigation }) {
                 setShowConfetti(false);
                 setAchievementRate(0); 
 
-            } else if (moveMethod === '출근 안 함/퇴근' || moveMethod === '해당 시간대 이동 없음') {
-                await skipToday();
+            } else if (moveMethod === '해당 시간대 이동 없음') {
+                await Promise.all([
+                    recordStairs(recordsPayload), 
+                    createJournal(journalText, parseInt(satisfaction, 10))
+                ]);
                 
                 setModalTitle('일지 작성 완료');
-                setModalMainText(
-                    moveMethod === '출근 안 함/퇴근' 
-                    ? '오늘은 푹 쉬시고,\n다음 출근 때 뵙겠습니다! 🙌🏻' 
-                    : '해당 시간대 이동 없음으로\n기록되었습니다! 🙌🏻'
-                );
+                setModalMainText('해당 시간대 이동 없음으로\n기록되었습니다! 🙌🏻');
+                setModalSubText('');
+                setShowConfetti(false);
+                setAchievementRate(0); 
+            
+            } else if (moveMethod === '출근 안 함/퇴근') {
+                await Promise.all([
+                    recordStairs(recordsPayload), 
+                    skipToday() 
+                ]);
+                
+                setModalTitle('일지 작성 완료');
+                setModalMainText('오늘은 푹 쉬시고,\n다음 출근 때 뵙겠습니다! 🙌🏻');
                 setModalSubText('');
                 setShowConfetti(false);
                 setAchievementRate(0);
