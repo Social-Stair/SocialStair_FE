@@ -27,7 +27,7 @@ export default function RecordWriteScreen({ navigation }) {
     const [loading, setLoading] = useState(false);
 
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const [moveMethod, setMoveMethod] = useState('계단'); 
+    const [moveMethod, setMoveMethod] = useState('계단 이용'); 
 
     const [recordTimes, setRecordTimes] = useState(['']); 
     
@@ -50,8 +50,8 @@ export default function RecordWriteScreen({ navigation }) {
     const [modalSubText, setModalSubText] = useState('삼성관 대학원생들의\n건강한 움직임을 응원합니다.\n지금의 좋은 기운을 유지해보세요!');
     const [showConfetti, setShowConfetti] = useState(true);
 
-    const isStairs = moveMethod === '계단';
-    const isNotWorking = moveMethod === '출근 안 함/퇴근';
+    const isStairs = moveMethod === '계단 이용';
+    const isNotWorking = moveMethod === '출근 안 함/퇴근' || moveMethod === '해당 시간대 이동 없음';
 
     const showCustomAlert = (title, message) => {
         if (Platform.OS === 'web') {
@@ -66,8 +66,7 @@ export default function RecordWriteScreen({ navigation }) {
         setIsDropdownOpen(false);
         setOpenDropdownInfo(null);
         
-        
-        if (method === '출근 안 함/퇴근') {
+        if (method === '출근 안 함/퇴근' || method === '해당 시간대 이동 없음') {
             setRecordTimes(['']);
             setStartFloors(['']);
             setEndFloors(['']);
@@ -75,7 +74,7 @@ export default function RecordWriteScreen({ navigation }) {
             setJournalText('');
             setWithFriend(false);
         } 
-        else if (method === '엘리베이터') {
+        else if (method === '엘리베이터 이용') {
             setRecordTimes(['']);
             setStartFloors(['']);
             setEndFloors(['']);
@@ -136,7 +135,7 @@ export default function RecordWriteScreen({ navigation }) {
     };
 
     const handleSubmit = async () => {
-        if (moveMethod === '계단' || moveMethod === '엘리베이터') {
+        if (moveMethod === '계단 이용' || moveMethod === '엘리베이터 이용') {
             const hasEmptyTime = recordTimes.some(time => !time.trim());
             const hasEmptyFloor = startFloors.some(f => !f.trim()) || endFloors.some(f => !f.trim());
             
@@ -149,7 +148,7 @@ export default function RecordWriteScreen({ navigation }) {
         setLoading(true);
 
         try {
-            if (moveMethod === '계단') {
+            if (moveMethod === '계단 이용') {
                 const recordsPayload = recordTimes.map((time, index) => ({
                     fromFloor: startFloors[index] === 'B1' ? -1 : parseInt(startFloors[index], 10),
                     toFloor: parseInt(endFloors[index], 10),
@@ -174,7 +173,7 @@ export default function RecordWriteScreen({ navigation }) {
                 setModalMainText(null); 
                 setShowConfetti(true);
 
-            } else if (moveMethod === '엘리베이터') {
+            } else if (moveMethod === '엘리베이터 이용') {
                 await createJournal(journalText, parseInt(satisfaction, 10));
                 
                 setModalTitle('일지 작성 완료');
@@ -183,12 +182,15 @@ export default function RecordWriteScreen({ navigation }) {
                 setShowConfetti(false);
                 setAchievementRate(0); 
 
-            
-            } else if (moveMethod === '출근 안 함/퇴근') {
+            } else if (moveMethod === '출근 안 함/퇴근' || moveMethod === '해당 시간대 이동 없음') {
                 await skipToday();
                 
                 setModalTitle('일지 작성 완료');
-                setModalMainText('오늘은 푹 쉬시고,\n다음 출근 때 뵙겠습니다! 🙌🏻');
+                setModalMainText(
+                    moveMethod === '출근 안 함/퇴근' 
+                    ? '오늘은 푹 쉬시고,\n다음 출근 때 뵙겠습니다! 🙌🏻' 
+                    : '해당 시간대 이동 없음으로\n기록되었습니다! 🙌🏻'
+                );
                 setModalSubText('');
                 setShowConfetti(false);
                 setAchievementRate(0);
@@ -277,8 +279,7 @@ export default function RecordWriteScreen({ navigation }) {
 
                 {isDropdownOpen && (
                     <View style={styles.dropdownList}>
-                    
-                    {['계단', '엘리베이터', '출근 안 함/퇴근'].map((method) => (
+                    {['계단 이용', '엘리베이터 이용', '해당 시간대 이동 없음', '출근 안 함/퇴근'].map((method) => (
                         <TouchableOpacity 
                         key={method} 
                         style={styles.dropdownItem}
