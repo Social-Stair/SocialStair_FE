@@ -41,7 +41,6 @@ export default function RecordWriteScreen({ navigation }) {
     
     const [satisfaction, setSatisfaction] = useState(1);
     const [journalText, setJournalText] = useState('');
-    const [withFriend, setWithFriend] = useState(false);
 
     const [isSuccessModalVisible, setSuccessModalVisible] = useState(false);
     const [achievementRate, setAchievementRate] = useState(30); 
@@ -50,7 +49,6 @@ export default function RecordWriteScreen({ navigation }) {
     const [modalSubText, setModalSubText] = useState('삼성관 대학원생들의\n건강한 움직임을 응원합니다.\n지금의 좋은 기운을 유지해보세요!');
     const [showConfetti, setShowConfetti] = useState(true);
 
-    const isStairs = moveMethod === '계단 이용';
     const isNotWorking = moveMethod === '출근 안 함/퇴근' || moveMethod === '해당 시간대 이동 없음';
 
     const showCustomAlert = (title, message) => {
@@ -72,7 +70,6 @@ export default function RecordWriteScreen({ navigation }) {
             setEndFloors(['']);
             setSatisfaction(1);
             setJournalText('');
-            setWithFriend(false);
         } 
         else if (method === '해당 시간대 이동 없음') {
             setRecordTimes(['']);
@@ -80,13 +77,11 @@ export default function RecordWriteScreen({ navigation }) {
             setEndFloors(['']);
             setSatisfaction(1);
             setJournalText('해당 시간대 이동이 없습니다.');
-            setWithFriend(false);
         }
         else if (method === '엘리베이터 이용') {
             setRecordTimes(['']);
             setStartFloors(['']);
             setEndFloors(['']);
-            setWithFriend(false);
         }
     };
 
@@ -171,7 +166,7 @@ export default function RecordWriteScreen({ navigation }) {
                     toFloor: isNaN(tFloor) ? 1 : tFloor,
                     time: time.trim() ? time : "00:00",
                     type: backendType, 
-                    withColleague: moveMethod === '계단 이용' ? withFriend : false
+                    withColleague: false
                 };
             });
 
@@ -495,24 +490,6 @@ export default function RecordWriteScreen({ navigation }) {
                     onChangeText={setJournalText}
                     editable={!isNotWorking} 
                 />
-                
-                {isStairs && (
-                    <View style={styles.checkboxContainer}>
-                    <TouchableOpacity 
-                        style={styles.checkboxRow}
-                        activeOpacity={0.8}
-                        onPress={() => setWithFriend(!withFriend)}
-                    >
-                        <View style={[styles.checkbox, withFriend && styles.checkboxActive]}>
-                        {withFriend && <Feather name="check" size={12} color={COLORS.white} />}
-                        </View>
-                        <Text style={styles.checkboxText}>친구와 함께 올랐어요!</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.checkboxSubText}>
-                        {"(계단 이용이 x2로 측정돼요! 오르락 단톡방에 친구와 함께한 계단 인증샷을 보내주세요!​)"}
-                    </Text>
-                    </View>
-                )}
                 </View>
 
             </View>
@@ -588,11 +565,5 @@ const styles = StyleSheet.create({
   satisfactionLabel: { fontFamily: 'Pretendard-Medium', fontSize: 12, color: COLORS.gray, letterSpacing: 12 * -0.025 },
   
   journalInput: { height: 145, backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, padding: 16, ...TYPOGRAPHY.placeholder, color: COLORS.black },
-  checkboxContainer: { alignItems: 'center', marginTop: 8, gap: 8 },
-  checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  checkbox: { width: 16, height: 16, borderWidth: 1, borderColor: COLORS.gray, borderRadius: 4, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.white },
-  checkboxActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  checkboxText: { fontFamily: 'Pretendard-SemiBold', fontSize: 14, color: COLORS.gray, letterSpacing: 14 * -0.025 },
-  checkboxSubText: { fontFamily: 'Pretendard-Medium', fontSize: 12, color: COLORS.gray, letterSpacing: 14 * -0.025, textAlign: 'center' },
   actionContainer: { marginTop: 24, alignItems: 'center' },
 });
