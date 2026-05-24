@@ -193,7 +193,6 @@ export default function HomeScreen({ navigation }) {
 
   useEffect(() => {
     const registerForPushNotificationsAsync = async () => {
-      // 1. [공통] userId 복구 로직 (웹과 앱 모두 반드시 실행되어야 함)
       let userId = null;
       if (Platform.OS === 'web') {
         userId = await AsyncStorage.getItem('userId');
@@ -212,14 +211,12 @@ export default function HomeScreen({ navigation }) {
             } else {
               await SecureStore.setItemAsync('userId', userId);
             }
-            console.log('userId 자동 복구 성공:', userId);
           }
         } catch (e) {
           console.log('userId 복구 실패:', e);
         }
       }
 
-      // 2. [앱 전용] 웹 환경이 아닐 때(앱일 때)만 푸시 토큰을 발급
       if (Platform.OS !== 'web') {
         if (Device.isDevice) {
           try {
@@ -245,11 +242,8 @@ export default function HomeScreen({ navigation }) {
   
             if (tokenData && tokenData.data) {
               const token = tokenData.data;
-              console.log('발급된 푸시 토큰:', token);
-              
               if (userId) {
                 await updateFcmToken(userId, token);
-                console.log('서버로 푸시 토큰 전송 완료');
               }
             }
           } catch (e) {
@@ -258,8 +252,6 @@ export default function HomeScreen({ navigation }) {
         } else {
           console.log("에뮬레이터(가상기기)에서는 푸시 알림 테스트가 불가능합니다.");
         }
-      } else {
-        console.log("웹(Web) 환경에서는 푸시 알림 토큰 발급을 건너뜁니다.");
       }
     };
 
@@ -329,9 +321,10 @@ export default function HomeScreen({ navigation }) {
               </View>
               <Text style={styles.statLabel}>지난 주 달성도</Text>
             </View>
-            <View style={styles.statValueRow}>
-              <Text style={styles.statNumber}>{lastWeekRate}</Text>
-              <Text style={styles.statUnit}>%</Text>
+            <View style={{ marginTop: 8 }}>
+              <Text style={{ fontFamily: 'Pretendard-SemiBold', fontSize: 13, color: COLORS.black, lineHeight: 20, letterSpacing: 13 * -0.025 }}>
+                오르락 총 목표층수{'\n'}216층 중 210층 달성!!🩵
+              </Text>
             </View>
           </View>
         </View>
