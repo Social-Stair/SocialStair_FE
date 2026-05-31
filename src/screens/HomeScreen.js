@@ -339,10 +339,15 @@ export default function HomeScreen({ navigation }) {
               </View>
               <Text style={styles.statLabel}>지난 주 달성도</Text>
             </View>
+            <View style={styles.statValueRow}>
+              <Text style={styles.statNumber}>2</Text>
+              <Text style={styles.statUnit}>주차</Text>
+            </View>
             <View style={{ marginTop: 8 }}>
               <Text style={{ fontFamily: 'Pretendard-Medium', fontSize: 12, color: COLORS.gray, lineHeight: 18, letterSpacing: 12 * -0.025 }}>
-                2주차 250층 중 <Text style={{ fontFamily: 'Pretendard-SemiBold', color: COLORS.primary }}>총 191층</Text> 달성!{'\n'}
-                건강하고 고소한 🎃<Text style={{ fontFamily: 'Pretendard-SemiBold', color: COLORS.black }}>호박팥차</Text> 적립✨
+                <Text style={{ fontFamily: 'Pretendard-SemiBold', color: COLORS.primary }}>총 191층</Text> 달성!{'\n'}
+                건강하고 고소한
+                🎃 <Text style={{ fontFamily: 'Pretendard-SemiBold', color: COLORS.black }}>호박팥차</Text>가 적립되었어요 🎃
               </Text>
             </View>
           </View>

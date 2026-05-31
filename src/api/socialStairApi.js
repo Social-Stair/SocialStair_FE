@@ -55,11 +55,11 @@ export const deleteRecords = async (recordIds) => {
     return response.data; 
 };
 
-export const getGoal = async (weekKey = '') => {
-    const response = await apiClient.get('https://getgoal-3dgekfmjca-uc.a.run.app', {
-      params: { weekKey }
-    });
-    return response.data; 
+export const getGoal = async (weekKey) => {
+  // weekKey가 존재할 때만 params 객체에 담아서 전송
+  const params = weekKey ? { weekKey } : {};
+  const response = await api.get('/getGoal', { params });
+  return response.data;
 };
 
 export const createJournal = async (content, satisfaction) => {
