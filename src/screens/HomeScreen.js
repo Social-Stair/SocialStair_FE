@@ -34,6 +34,7 @@ export default function HomeScreen({ navigation }) {
   const [goalData, setGoalData] = useState({ currentFloors: 0, goalFloors: 0, achievementRate: 0 });
   const [streak, setStreak] = useState(0); 
   const [lastWeekRate, setLastWeekRate] = useState(0); 
+  const [sharedGoal, setSharedGoal] = useState({ currentFloors: 210, goalFloors: 216 }); 
   const [notifications, setNotifications] = useState([]);
 
   const getRelativeTime = (timestamp) => {
@@ -90,14 +91,22 @@ export default function HomeScreen({ navigation }) {
           if (savedName) setNickname(savedName);
 
           const statsData = await getHomeStats();
-          if (statsData && statsData.members) {
-            const myData = statsData.members.find(m => m.nickname === savedName);
-            if (myData) {
-              setGoalData({
-                currentFloors: myData.currentFloors || 0,
-                goalFloors: myData.goalFloors || 0,
-                achievementRate: myData.achievementRate || 0,
+          if (statsData) {
+            if (statsData.sharedGoal) {
+              setSharedGoal({
+                currentFloors: statsData.sharedGoal.currentFloors || 0,
+                goalFloors: statsData.sharedGoal.goalFloors || 0,
               });
+            }
+            if (statsData.members) {
+              const myData = statsData.members.find(m => m.nickname === savedName);
+              if (myData) {
+                setGoalData({
+                  currentFloors: myData.currentFloors || 0,
+                  goalFloors: myData.goalFloors || 0,
+                  achievementRate: myData.achievementRate || 0,
+                });
+              }
             }
           }
 
@@ -301,6 +310,8 @@ export default function HomeScreen({ navigation }) {
         </View>
 
         <View style={styles.statsRow}>
+          
+          {/* 연속 기록 카드 */}
           <View style={styles.statCard}>
             <View style={styles.statHeader}>
               <View style={styles.iconCircle}>
@@ -312,8 +323,15 @@ export default function HomeScreen({ navigation }) {
               <Text style={styles.statNumber}>{streak}</Text>
               <Text style={styles.statUnit}>일</Text>
             </View>
+            <View style={{ marginTop: 8 }}>
+              <Text style={{ fontFamily: 'Pretendard-Medium', fontSize: 12, color: COLORS.gray, lineHeight: 18, letterSpacing: 12 * -0.025 }}>
+                마지막 주차 계단 오르기 시작!{'\n'}
+                목표 층수 <Text style={{ fontFamily: 'Pretendard-SemiBold', color: COLORS.primary }}>100%</Text> 를 달성해봐요 💪
+              </Text>
+            </View>
           </View>
 
+          {/* 지난 주 달성도 카드 */}
           <View style={styles.statCard}>
             <View style={styles.statHeader}>
               <View style={styles.iconCircle}>
@@ -322,11 +340,13 @@ export default function HomeScreen({ navigation }) {
               <Text style={styles.statLabel}>지난 주 달성도</Text>
             </View>
             <View style={{ marginTop: 8 }}>
-              <Text style={{ fontFamily: 'Pretendard-SemiBold', fontSize: 13, color: COLORS.black, lineHeight: 20, letterSpacing: 13 * -0.025 }}>
-                오르락 총 목표층수{'\n'}216층 중 210층 달성!!🩵
+              <Text style={{ fontFamily: 'Pretendard-Medium', fontSize: 12, color: COLORS.gray, lineHeight: 18, letterSpacing: 12 * -0.025 }}>
+                2주차 250층 중 <Text style={{ fontFamily: 'Pretendard-SemiBold', color: COLORS.primary }}>총 191층</Text> 달성!{'\n'}
+                건강하고 고소한 🎃<Text style={{ fontFamily: 'Pretendard-SemiBold', color: COLORS.black }}>호박팥차</Text> 적립✨
               </Text>
             </View>
           </View>
+
         </View>
 
         <View style={styles.notificationSection}>
